@@ -385,8 +385,14 @@ def _fill_and_submit_form_impl(
                     # After wizard, we should be on the final submit/review page
                     # Continue with standard submission logic
 
+            # ── Field Detection Context ─────────────────────────────────────
+            # If the application form is embedded inside an iframe (like on many
+            # company sites using Greenhouse/Lever), we drive that iframe instead
+            # of the main page context.
+            form_context = get_form_context(page)
+
             # ── Field Detection Inventory ──────────────────────────────────
-            _log_field_inventory(page, add_log)
+            _log_field_inventory(form_context, add_log)
 
             # ── Fill Text/Email/Tel/Number Inputs ─────────────────────────
             add_log("Filling standard text fields...")
@@ -395,12 +401,12 @@ def _fill_and_submit_form_impl(
             # type="search" is excluded: job boards (Greenhouse, LinkedIn, Indeed, ...)
             # all carry their own site-search box unrelated to the application —
             # without this it gets mistaken for an unmapped application question.
-            inputs = page.query_selector_all('input:not([type="hidden"]):not([type="submit"]):not([type="file"]):not([type="search"]), textarea')
+            inputs = form_context.query_selector_all('input:not([type="hidden"]):not([type="submit"]):not([type="file"]):not([type="search"]), textarea')
             for inp in inputs:
                 try:
                     if not inp.is_visible():
                         continue
-                    label_text = get_field_label(page, inp).lower()
+                    label_text = get_field_label(form_context, inp).lower()
                     if any(x in label_text for x in ('recaptcha', 'captcha', 'csrf')):
                         continue
                     field_type = (inp.get_attribute('type') or 'text').lower()
@@ -431,27 +437,27 @@ def _fill_and_submit_form_impl(
 
             # ── Handle Select Dropdowns ───────────────────────────────────
             add_log("Handling dropdowns...")
-            selects = page.query_selector_all('select')
+            selects = form_context.query_selector_all('select')
             for sel in selects:
                 try:
                     if not sel.is_visible():
                         continue
-                    label_text = get_field_label(page, sel).lower()
+                    label_text = get_field_label(form_context, sel).lower()
                     name_attr  = (sel.get_attribute('name') or '').lower()
                     
                     if any(k in label_text or k in name_attr for k in ['country', 'citizenship', 'location']):
                         # Try to select a sensible default
-                        try_select_option(page, sel, ['United States', 'US', 'India', 'Other'], add_log)
+                        try_select_option(form_context, sel, ['United States', 'US', 'India', 'Other'], add_log)
                     elif any(k in label_text or k in name_attr for k in ['experience', 'year']):
-                        try_select_option(page, sel, [str(form_data.get('experience_years', '1')), '1-3 years', '1+ year'], add_log)
+                        try_select_option(form_context, sel, [str(form_data.get('experience_years', '1')), '1-3 years', '1+ year'], add_log)
                     elif any(k in label_text or k in name_attr for k in ['gender']):
-                        try_select_option(page, sel, ['Prefer not to say', 'Not specified', 'Other'], add_log)
+                        try_select_option(form_context, sel, ['Prefer not to say', 'Not specified', 'Other'], add_log)
                     elif any(k in label_text or k in name_attr for k in ['ethnicity', 'race']):
-                        try_select_option(page, sel, ['Decline to self identify', 'Prefer not to say'], add_log)
+                        try_select_option(form_context, sel, ['Decline to self identify', 'Prefer not to say'], add_log)
                     elif any(k in label_text or k in name_attr for k in ['disability']):
-                        try_select_option(page, sel, ['No', 'I do not have a disability', 'Not disabled'], add_log)
+                        try_select_option(form_context, sel, ['No', 'I do not have a disability', 'Not disabled'], add_log)
                     elif any(k in label_text or k in name_attr for k in ['veteran']):
-                        try_select_option(page, sel, ['No', 'I am not a protected veteran', 'Not a veteran'], add_log)
+                        try_select_option(form_context, sel, ['No', 'I am not a protected veteran', 'Not a veteran'], add_log)
                     elif label_text.strip():
                         options = sel.query_selector_all('option')
                         opt_texts = [o.inner_text().strip() for o in options if o.get_attribute('value')]
@@ -460,7 +466,7 @@ def _fill_and_submit_form_impl(
                             add_log(f"  Unmapped select: '{label_text}' -> asking AI")
                             answer = _resolve_via_review_queue(add_log, user_id, job_id, prompt, form_data, resume_text)
                             if answer:
-                                try_select_option(page, sel, [answer], add_log)
+                                try_select_option(form_context, sel, [answer], add_log)
                             else:
                                 add_log(f"  Leaving '{label_text}' unset.", "warn")
                 except Exception as e:
@@ -470,12 +476,12 @@ def _fill_and_submit_form_impl(
             # ── Handle Standalone Checkboxes ──────────────────────────────
             add_log("Handling checkboxes...")
             consent_keywords = ['agree', 'consent', 'terms', 'privacy policy', 'acknowledge', 'confirm that']
-            checkboxes = page.query_selector_all('input[type="checkbox"]')
+            checkboxes = form_context.query_selector_all('input[type="checkbox"]')
             for cb in checkboxes:
                 try:
                     if not cb.is_visible():
                         continue
-                    label_text = get_field_label(page, cb).lower().strip()
+                    label_text = get_field_label(form_context, cb).lower().strip()
                     if any(kw in label_text for kw in ('email updates', 'job alert', 'subscribe', 'newsletter', 'receive updates', 'send me')):
                         add_log(f"  Skipping marketing/alert checkbox: '{label_text}'")
                         continue
@@ -502,11 +508,11 @@ def _fill_and_submit_form_impl(
                 answer   = (qa_item.get('answer') or 'No').strip()
                 try:
                     # Find radio buttons matching this question
-                    radios = page.query_selector_all('input[type="radio"]')
+                    radios = form_context.query_selector_all('input[type="radio"]')
                     for radio in radios:
                         if not radio.is_visible():
                             continue
-                        radio_label = get_field_label(page, radio).strip()
+                        radio_label = get_field_label(form_context, radio).strip()
                         parent_text = ''
                         try:
                             parent = radio.evaluate('el => el.closest("fieldset, .form-group, [role=group]")?.innerText || ""')
@@ -525,7 +531,7 @@ def _fill_and_submit_form_impl(
             # ── Escalate Radio Groups Left Unanswered by custom_qa ────────
             add_log("Checking for unanswered radio groups...")
             try:
-                all_radios = page.query_selector_all('input[type="radio"]')
+                all_radios = form_context.query_selector_all('input[type="radio"]')
                 groups = {}
                 for radio in all_radios:
                     if not radio.is_visible():
@@ -540,7 +546,7 @@ def _fill_and_submit_form_impl(
                         if any(r.is_checked() for r in radios):
                             continue
                         group_label = _get_radio_group_label(radios[0]) or name_attr
-                        option_labels = [get_field_label(page, r).strip() for r in radios]
+                        option_labels = [get_field_label(form_context, r).strip() for r in radios]
                         question_text = f"{group_label} (options: {', '.join(o for o in option_labels if o)})"
                         add_log(f"  Unanswered radio group: '{group_label}' -> pausing for your review")
                         answer = _resolve_via_review_queue(add_log, user_id, job_id, question_text, form_data, resume_text)
@@ -568,7 +574,7 @@ def _fill_and_submit_form_impl(
             if resume_path and os.path.exists(resume_path):
                 add_log(f"Uploading resume: {resume_path}")
                 try:
-                    file_inputs = page.query_selector_all('input[type="file"]')
+                    file_inputs = form_context.query_selector_all('input[type="file"]')
                     if file_inputs:
                         file_inputs[0].set_input_files(resume_path)
                         page.wait_for_timeout(1500)
@@ -596,21 +602,43 @@ def _fill_and_submit_form_impl(
 
             # ── Click Submit Button ───────────────────────────────────────
             add_log("Looking for submit button...")
-            submit_sel = find_submit_button(page)
+            submit_sel = find_submit_button(form_context)
             if submit_sel:
                 add_log("  Submit button found — clicking.")
                 try:
-                    page.locator(submit_sel).scroll_into_view_if_needed()
+                    # Avoid strict mode violation by resolving to a single visible locator
+                    btn_locator = form_context.locator(submit_sel)
+                    target_locator = None
+                    for i in range(btn_locator.count()):
+                        loc = btn_locator.nth(i)
+                        if loc.is_visible():
+                            target_locator = loc
+                            break
+                    if not target_locator:
+                        target_locator = btn_locator.first
+
+                    target_locator.scroll_into_view_if_needed()
                     page.wait_for_timeout(500)
-                    page.click(submit_sel, timeout=10000)
+                    target_locator.click(timeout=10000)
                     page.wait_for_timeout(4000)
                     add_log("  Form submitted!")
                     steps_done = 10
                 except Exception as e:
-                    add_log(f"  Click failed with page.click: {str(e)} — attempting fallback JS click...", "warn")
+                    add_log(f"  Click failed: {str(e)} — attempting fallback JS click...", "warn")
                     try:
-                        page.locator(submit_sel).scroll_into_view_if_needed()
-                        page.evaluate(f'document.querySelector("{submit_sel}").click()')
+                        # Re-locate to ensure we evaluate on a single visible element
+                        btn_locator = form_context.locator(submit_sel)
+                        target_locator = None
+                        for i in range(btn_locator.count()):
+                            loc = btn_locator.nth(i)
+                            if loc.is_visible():
+                                target_locator = loc
+                                break
+                        if not target_locator:
+                            target_locator = btn_locator.first
+
+                        target_locator.scroll_into_view_if_needed()
+                        target_locator.evaluate("el => el.click()")
                         page.wait_for_timeout(4000)
                         add_log("  Form submitted via fallback JS click!")
                         steps_done = 10
@@ -910,9 +938,10 @@ def _find_apply_button(page):
 
     for sel in apply_selectors:
         try:
-            candidate = page.query_selector(sel)
-            if candidate and candidate.is_visible():
-                return candidate
+            elements = page.query_selector_all(sel)
+            for candidate in elements:
+                if candidate and candidate.is_visible():
+                    return candidate
         except Exception:
             continue
 
@@ -925,9 +954,10 @@ def _find_apply_button(page):
 
     for sel in apply_selectors:
         try:
-            candidate = page.query_selector(sel)
-            if candidate and candidate.is_visible():
-                return candidate
+            elements = page.query_selector_all(sel)
+            for candidate in elements:
+                if candidate and candidate.is_visible():
+                    return candidate
         except Exception:
             continue
     return None
@@ -971,9 +1001,10 @@ def _find_next_button(page):
     
     for sel in next_selectors:
         try:
-            btn = page.query_selector(sel)
-            if btn and btn.is_visible():
-                return btn
+            elements = page.query_selector_all(sel)
+            for btn in elements:
+                if btn and btn.is_visible():
+                    return btn
         except Exception:
             continue
     return None
@@ -1238,6 +1269,45 @@ def _click_apply_and_switch(ctx, page, add_log, is_multi_step: bool = False):
     return page
 
 
+def get_form_context(page):
+    """
+    Returns the frame (either page or a child iframe) that contains the application form.
+    Heuristic: The frame with the most visible input/textarea elements.
+    """
+    # Wait up to 5 seconds for the form to render in some frame if initially empty
+    for attempt in range(5):
+        best_frame = page
+        max_inputs = 0
+        
+        try:
+            main_inputs = len([el for el in page.query_selector_all('input:not([type="hidden"]), textarea') if el.is_visible()])
+            if main_inputs > 0:
+                max_inputs = main_inputs
+        except Exception:
+            pass
+            
+        for frame in page.frames:
+            if frame == page.main_frame:
+                continue
+            try:
+                inputs = frame.query_selector_all('input:not([type="hidden"]), textarea')
+                visible_count = len([el for el in inputs if el.is_visible()])
+                if visible_count > max_inputs:
+                    max_inputs = visible_count
+                    best_frame = frame
+            except Exception:
+                continue
+        
+        if max_inputs > 0:
+            if best_frame != page:
+                logger.info(f"Detected form inside iframe (name={best_frame.name}, url={best_frame.url}) with {max_inputs} fields.")
+            return best_frame
+            
+        page.wait_for_timeout(1000)
+        
+    return page
+
+
 def _log_field_inventory(page, add_log):
     """Logs every visible input/select/textarea detected on the page so you can verify
     what the automation found vs. what's actually on the page."""
@@ -1464,7 +1534,7 @@ Output Rules:
 
 def _score_ai_answer(answer: str) -> tuple:
     """Simple confidence scoring based on answer quality/shape."""
-    if not answer or answer.lower() in ["not specified", "unknown", "n/a"]:
+    if not answer or any(k in answer.lower() for k in ["not specified", "unknown", "n/a", "no details", "no information"]):
         return None, 0.0
     elif len(answer) < 10:
         return answer, 0.5
@@ -1532,9 +1602,10 @@ def find_submit_button(page):
     ]
     for sel in selectors:
         try:
-            btn = page.query_selector(sel)
-            if btn and btn.is_visible():
-                return sel
+            elements = page.query_selector_all(sel)
+            for btn in elements:
+                if btn and btn.is_visible():
+                    return sel
         except Exception:
             continue
     return None
