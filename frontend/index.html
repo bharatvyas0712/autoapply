@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - AutoJobApply Portal</title>
+  <link rel="stylesheet" href="css/main.css">
+  <meta name="description" content="Login to your AutoJobApply portal to automate job applications.">
+</head>
+<body>
+  <div class="auth-page">
+    <!-- Left Hero Section -->
+    <div class="auth-left">
+      <div class="auth-hero fade-in">
+        <h1>Simplify Your Job Search with AI & Automation</h1>
+        <p>Upload your resume, verify parsed details, paste any carrier portal link, and let our engine automatically apply with accurate, tailored form filling.</p>
+        
+        <div class="auth-features">
+          <div class="auth-feature">
+            <span class="feat-icon">⚡</span>
+            <span class="feat-text"><strong>Instant Scraping:</strong> Just paste a URL & auto-discover form fields.</span>
+          </div>
+          <div class="auth-feature">
+            <span class="feat-icon">🎯</span>
+            <span class="feat-text"><strong>Smart Answers:</strong> Auto-fills Yes/No and experience questions dynamically.</span>
+          </div>
+          <div class="auth-feature">
+            <span class="feat-icon">🛡️</span>
+            <span class="feat-text"><strong>Human-in-the-Loop:</strong> Review and edit all fields before final submission.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Login Form Section -->
+    <div class="auth-right slide-in">
+      <div class="auth-form-header">
+        <div class="auth-logo">
+          <div class="auth-logo-icon">a</div>
+          <h2 style="font-size: 20px; font-weight: 700; color: var(--text-primary);">AutoJobApply</h2>
+        </div>
+        <h2>Sign In</h2>
+        <p>Welcome back! Please enter your details.</p>
+      </div>
+
+      <form id="login-form" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label class="form-label" for="email">Email Address <span class="required">*</span></label>
+          <div class="input-group">
+            <span class="input-icon">✉️</span>
+            <input type="email" id="email" class="form-control" placeholder="you@example.com" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="password">Password <span class="required">*</span></label>
+          <div class="input-group">
+            <span class="input-icon">🔒</span>
+            <input type="password" id="password" class="form-control" placeholder="••••••••" required>
+          </div>
+        </div>
+
+        <div class="form-group" style="display: flex; align-items: center; justify-content: space-between; margin-top: 10px;">
+          <label class="toggle" style="gap: 8px;">
+            <input type="checkbox" id="remember">
+            <div class="toggle-track" style="width: 36px; height: 20px;">
+              <div class="toggle-thumb" style="width: 14px; height: 14px;"></div>
+            </div>
+            <span class="toggle-label" style="font-size: 13px;">Remember me</span>
+          </label>
+          <a href="#" class="dz-link" style="font-size: 13px;">Forgot password?</a>
+        </div>
+
+        <button type="submit" id="submit-btn" class="btn btn-primary btn-full btn-lg" style="margin-top: 12px;">
+          Sign In
+        </button>
+
+        <div class="divider-text" style="margin: 24px 0;">New to the platform?</div>
+
+        <a href="register.html" class="btn btn-secondary btn-full">
+          Create an Account
+        </a>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/theme.js"></script>
+  <script src="js/auth.js"></script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+sqlalchemy
+aiomysql
+pydantic
+pydantic-settings
+python-dotenv
+httpx
+openai
+pypdf
+docx2txt

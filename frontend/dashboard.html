@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - AutoJobApply</title>
+  <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Sidebar (Injected dynamically) -->
+    <div class="sidebar"></div>
+
+    <div class="main-content">
+      <!-- Topbar -->
+      <div class="topbar">
+        <button class="hamburger" onclick="document.querySelector('.sidebar').classList.toggle('open')">☰</button>
+        <div class="topbar-title">Dashboard</div>
+        <div class="topbar-right">
+          <button class="theme-toggle-btn" onclick="toggleTheme()" title="Toggle Dark/Light Mode">🌓</button>
+        </div>
+      </div>
+
+      <!-- Page Body -->
+      <div class="page-body fade-in">
+        <div class="page-header">
+          <div class="page-header-row">
+            <div>
+              <h1 id="welcome-text">Welcome back!</h1>
+              <p>Automate your tech job search. Paste a link or choose from your tracked carrier list.</p>
+            </div>
+            <div style="display: flex; gap: 10px;">
+              <button class="btn btn-secondary" onclick="openScrapeModal()">🔗 Scrape Custom URL</button>
+              <a href="profile.html" class="btn btn-primary">👤 Setup Profile Wizard</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stat Grid -->
+        <div class="grid-4" style="margin-bottom: 28px;">
+          <div class="stat-card">
+            <div class="stat-icon orange">💼</div>
+            <div>
+              <div class="stat-number" id="stat-total-jobs">0</div>
+              <div class="stat-label">Total Jobs Found</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon blue">🚀</div>
+            <div>
+              <div class="stat-number" id="stat-applied">0</div>
+              <div class="stat-label">Applied Jobs</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon green">✅</div>
+            <div>
+              <div class="stat-number" id="stat-success-apps">0</div>
+              <div class="stat-label">Submissions Success</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon red">❌</div>
+            <div>
+              <div class="stat-number" id="stat-failed-apps">0</div>
+              <div class="stat-label">Submissions Failed</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-3">
+          <!-- Left Column: Scrape / Paste URL directly -->
+          <div class="card" style="grid-column: span 2;">
+            <div class="card-header">
+              <div>
+                <h3 class="card-title">Quick Scrape & Apply</h3>
+                <p class="card-subtitle">Paste any job description or carrier application form URL to fill details automatically</p>
+              </div>
+            </div>
+            <div class="card-body">
+              <form onsubmit="handleQuickScrape(event)">
+                <div class="form-group">
+                  <label class="form-label" for="quick-url">Job Posting / Application Form URL <span class="required">*</span></label>
+                  <div class="input-group">
+                    <span class="input-icon">🔗</span>
+                    <input type="url" id="quick-url" class="form-control" placeholder="https://careers.google.com/jobs/results/..." required>
+                  </div>
+                  <p class="form-hint">Supports Greenhouse, Lever, Workday, LinkedIn jobs, Internshala, and general job boards.</p>
+                </div>
+                <button type="submit" id="scrape-submit-btn" class="btn btn-primary" style="margin-top: 5px;">
+                  Analyze & Auto-Fill Application Form
+                </button>
+              </form>
+            </div>
+          </div>
+
+          <!-- Right Column: Resume Upload Quick Widget -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h3 class="card-title">Active Resume</h3>
+                <p class="card-subtitle">Upload to automatically parsed master details</p>
+              </div>
+            </div>
+            <div class="card-body" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; min-height: 180px;">
+              <div id="resume-status-empty" style="text-align: center;">
+                <div class="dz-icon" style="font-size: 32px; margin-bottom: 8px;">📄</div>
+                <h4 style="font-size: 14px; font-weight: 600;">No Resume Active</h4>
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">Upload PDF to parse fields instantly</p>
+                <a href="profile.html?wizard=resume" class="btn btn-secondary btn-sm">Upload Resume</a>
+              </div>
+              <div id="resume-status-active" style="text-align: center; display: none;">
+                <div class="badge badge-green" style="margin-bottom: 8px;">Active</div>
+                <h4 id="resume-file-name" style="font-size: 14px; font-weight: 600; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 220px;">resume.pdf</h4>
+                <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;" id="resume-parsed-info">Skills parsed: --</p>
+                <a href="profile.html" class="btn btn-secondary btn-sm" style="margin-top: 12px;">Update details</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Recent Jobs / Applications Activity -->
+        <div class="card" style="margin-top: 28px;">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title">Recent Job Tracker Activity</h3>
+              <p class="card-subtitle">Track status of jobs fetched or applications run</p>
+            </div>
+            <a href="history.html" class="btn btn-secondary btn-sm">View Full History</a>
+          </div>
+          <div class="card-body">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Job Title</th>
+                    <th>Company</th>
+                    <th>Source</th>
+                    <th>Date Added</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="recent-jobs-tbody">
+                  <!-- Injected via JavaScript -->
+                  <tr>
+                    <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 32px;">
+                      <span class="spinner" style="margin: 0 auto 12px;"></span>
+                      Loading recent activities...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Scrape Modal -->
+  <div class="modal-overlay" id="scrape-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">Analyze Custom Job Link</h3>
+        <button class="modal-close" onclick="closeScrapeModal()">✕</button>
+      </div>
+      <form onsubmit="handleQuickScrape(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label" for="modal-quick-url">Job URL <span class="required">*</span></label>
+            <input type="url" id="modal-quick-url" class="form-control" placeholder="https://..." required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeScrapeModal()">Cancel</button>
+          <button type="submit" id="modal-scrape-btn" class="btn btn-primary">Scrape & Open Review</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/theme.js"></script>
+  <script src="js/dashboard.js"></script>
+  <script src="js/browser_widget.js"></script>
+</body>
+</html>

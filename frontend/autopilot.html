@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Auto-Pilot - AutoJobApply</title>
+  <link rel="stylesheet" href="css/main.css">
+  <style>
+    .agent-hero {
+      background: linear-gradient(135deg, rgba(20,110,180,0.10), rgba(255,153,0,0.12));
+      border: 1px solid rgba(255,153,0,0.25);
+      border-radius: 14px; padding: 24px; margin-bottom: 24px;
+    }
+    .agent-controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-top: 16px; }
+    .agent-controls .form-group { margin: 0; flex: 1; min-width: 160px; }
+    .fit-ring {
+      --pct: 0; width: 54px; height: 54px; border-radius: 50%; flex-shrink: 0;
+      background: conic-gradient(var(--ring-color, #FF9900) calc(var(--pct)*1%), var(--border-color) 0);
+      display: grid; place-items: center; font-weight: 800; font-size: 13px;
+    }
+    .fit-ring span { width: 42px; height: 42px; border-radius: 50%; background: var(--bg-card); display: grid; place-items: center; }
+    .skill-chip { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 20px; margin: 2px; }
+    .chip-match { background: rgba(46,160,67,0.15); color: var(--status-success-text, #2ea043); }
+    .chip-miss  { background: rgba(210,60,60,0.12); color: var(--status-error-text, #d23c3c); }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <div class="sidebar"></div>
+
+    <div class="main-content">
+      <div class="topbar">
+        <button class="hamburger" onclick="document.querySelector('.sidebar').classList.toggle('open')">☰</button>
+        <div class="topbar-title">AI Auto-Pilot</div>
+        <div class="topbar-right">
+          <button class="theme-toggle-btn" onclick="toggleTheme()">🌓</button>
+        </div>
+      </div>
+
+      <div class="page-body fade-in">
+        <div class="page-header">
+          <h1>🤖 AI Auto-Pilot</h1>
+          <p>The agent reads your resume, finds matching jobs across job boards, scores each one, and hands you a shortlist to approve.</p>
+        </div>
+
+        <div class="agent-hero">
+          <div style="font-weight: 700;">Run the agent</div>
+          <p style="font-size: 13px; color: var(--text-muted); margin: 4px 0 0;">
+            Leave fields blank to auto-fill from your profile. Only jobs above the match threshold are shown.
+          </p>
+          <div class="agent-controls">
+            <div class="form-group">
+              <label class="form-label">Role / Keywords</label>
+              <input type="text" id="agent-query" class="form-control" placeholder="Auto from resume">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Location</label>
+              <input type="text" id="agent-location" class="form-control" placeholder="Auto from profile">
+            </div>
+            <div class="form-group" style="max-width: 200px;">
+              <label class="form-label">Source</label>
+              <select id="agent-source" class="form-control" onchange="toggleEasyApplyOption()">
+                <option value="all">All Sources (widest reach)</option>
+                <option value="ats">Company Boards (reliable)</option>
+                <option value="indeed">Indeed</option>
+                <option value="linkedin">LinkedIn</option>
+              </select>
+            </div>
+            <div class="form-group" style="max-width: 130px;">
+              <label class="form-label">Min match %</label>
+              <input type="number" id="agent-minscore" class="form-control" value="40" min="0" max="100">
+            </div>
+            <div class="form-group" id="easy-apply-group" style="max-width: 170px; display: none;">
+              <label class="form-label" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                <input type="checkbox" id="agent-easy-apply" style="width:16px; height:16px;">
+                Easy Apply only
+              </label>
+            </div>
+            <button class="btn btn-primary" id="agent-run-btn" onclick="runAgent()" style="height: 42px;">
+              ⚡ Run Agent
+            </button>
+          </div>
+        </div>
+
+        <div id="agent-status" style="display:none; text-align:center; padding: 32px; color: var(--text-muted);"></div>
+
+        <div id="agent-results"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/theme.js"></script>
+  <script src="js/autopilot.js"></script>
+</body>
+</html>

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Application History - AutoJobApply</title>
+  <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+  <div class="app-layout">
+    <div class="sidebar"></div>
+
+    <div class="main-content">
+      <div class="topbar">
+        <button class="hamburger" onclick="document.querySelector('.sidebar').classList.toggle('open')">☰</button>
+        <div class="topbar-title">Application History</div>
+        <div class="topbar-right">
+          <button class="theme-toggle-btn" onclick="toggleTheme()">🌓</button>
+        </div>
+      </div>
+
+      <div class="page-body fade-in">
+        <div class="page-header">
+          <div class="page-header-row">
+            <div>
+              <h1>Application History</h1>
+              <p>All job applications you've run through the automation engine.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filter bar -->
+        <div class="filter-bar">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="hist-search" placeholder="Search by title or company..." oninput="filterHistory()">
+          </div>
+          <select id="hist-status-filter" class="form-control" style="width:auto;" onchange="filterHistory()">
+            <option value="">All Statuses</option>
+            <option value="submitted">Submitted</option>
+            <option value="review">In Review</option>
+            <option value="failed">Failed</option>
+            <option value="draft">Draft</option>
+          </select>
+        </div>
+
+        <!-- Table -->
+        <div class="card" style="padding:0; overflow:hidden;">
+          <div class="table-wrap" style="border:none; border-radius:0;">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Job Title</th>
+                  <th>Company</th>
+                  <th>Status</th>
+                  <th>Submitted At</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="history-tbody">
+                <tr>
+                  <td colspan="6" style="text-align:center; color:var(--text-muted); padding:36px;">
+                    <span class="spinner" style="margin:0 auto 12px;"></span>
+                    Loading application history...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Application Detail Modal -->
+  <div class="modal-overlay" id="detail-modal">
+    <div class="modal" style="max-width:680px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="detail-modal-title">Application Details</h3>
+        <button class="modal-close" onclick="closeDetailModal()">✕</button>
+      </div>
+      <div id="detail-modal-body" style="max-height:60vh; overflow-y:auto;">
+        <!-- Injected via JS -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeDetailModal()">Close</button>
+        <button class="btn btn-primary" id="detail-reapply-btn">🔄 Re-Open & Edit</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/theme.js"></script>
+  <script src="js/history.js"></script>
+</body>
+</html>

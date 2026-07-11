@@ -1,0 +1,8 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'autojobapply-api'
+    static_configs:
+      - targets: ['localhost:8000', 'localhost:5005', 'localhost:5006', 'localhost:5007', 'localhost:5008', 'localhost:5009']

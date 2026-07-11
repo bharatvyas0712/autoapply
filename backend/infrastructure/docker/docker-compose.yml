@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: production_mysql
+    environment:
+      MYSQL_DATABASE: autojobapply
+      MYSQL_ROOT_PASSWORD: rootpassword
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  redis:
+    image: redis:7.0-alpine
+    container_name: production_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  celery_worker:
+    build:
+      context: ../
+      dockerfile: infrastructure/docker/Dockerfile.prod
+    command: celery -A celery_app worker --loglevel=info
+    depends_on:
+      - redis
+      - mysql
+    environment:
+      - DB_HOST=mysql
+      - DB_USER=root
+      - DB_PASSWORD=rootpassword
+      - REDIS_URL=redis://redis:6379/0
+
+volumes:
+  mysql_data:
+  redis_data:

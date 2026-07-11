@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+sqlalchemy
+aiomysql
+pydantic
+pydantic-settings
+python-dotenv
+cryptography
+openai

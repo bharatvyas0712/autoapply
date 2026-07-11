@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+sqlalchemy
+aiomysql
+pydantic
+aiohttp
+playwright
+apscheduler
+python-dotenv
+cryptography

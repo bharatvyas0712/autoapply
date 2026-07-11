@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: autojobapply_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: autojobapply
+      MYSQL_USER: ${DB_USER:-autojobapply}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-rootpassword}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./backend/models/db_schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    networks:
+      - autojobapply_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: autojobapply_backend
+    environment:
+      PORT: 3000
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: ${DB_USER:-autojobapply}
+      DB_PASSWORD: ${DB_PASSWORD:-rootpassword}
+      DB_NAME: autojobapply
+      JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
+      AUTOMATION_SERVICE_URL: http://automation:5001
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./backend/uploads:/app/uploads
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - autojobapply_network
+    restart: unless-stopped
+
+  # Python Automation Service
+  automation:
+    build:
+      context: .
+      dockerfile: automation/Dockerfile
+    container_name: autojobapply_automation
+    environment:
+      PORT: 5001
+      FORM_AGENT_SERVICE_URL: http://backend:3000
+      AUTOJOBAPPLY_LOGIN_WAIT_SECONDS: 600
+      AUTOJOBAPPLY_FIELD_REVIEW_TIMEOUT_SECONDS: 900
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./browser_profile:/app/browser_profile
+      - ./backend/uploads:/app/uploads
+    depends_on:
+      - backend
+    networks:
+      - autojobapply_network
+    restart: unless-stopped
+    # Display for headed browser (optional)
+    # environment:
+    #   DISPLAY: host.docker.internal:0
+
+volumes:
+  mysql_data:
+
+networks:
+  autojobapply_network:
+    driver: bridge

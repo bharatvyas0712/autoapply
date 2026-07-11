@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings - AutoJobApply</title>
+  <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+  <div class="app-layout">
+    <div class="sidebar"></div>
+
+    <div class="main-content">
+      <div class="topbar">
+        <button class="hamburger" onclick="document.querySelector('.sidebar').classList.toggle('open')">☰</button>
+        <div class="topbar-title">Settings</div>
+        <div class="topbar-right">
+          <button class="theme-toggle-btn" onclick="toggleTheme()">🌓</button>
+        </div>
+      </div>
+
+      <div class="page-body fade-in">
+        <div class="page-header">
+          <h1>Account Settings</h1>
+          <p>Manage your preferences, security, and account details.</p>
+        </div>
+
+        <div class="grid-2" style="align-items:start; gap:24px;">
+          <!-- Left Column -->
+          <div style="display:flex; flex-direction:column; gap:24px;">
+
+            <!-- Appearance -->
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <h3 class="card-title">Appearance</h3>
+                  <p class="card-subtitle">Customize how AutoJobApply looks on your device</p>
+                </div>
+              </div>
+              <div class="card-body">
+                <div style="display:flex; align-items:center; justify-content:space-between; padding:16px; background:var(--bg-input); border-radius:12px; border:1px solid var(--border-color);">
+                  <div style="display:flex; align-items:center; gap:12px;">
+                    <span style="font-size:22px;" id="theme-icon-display">🌙</span>
+                    <div>
+                      <div style="font-weight:600; font-size:14px;" id="theme-name-display">Dark Mode</div>
+                      <div style="font-size:12px; color:var(--text-muted);">Toggle between dark and light interface</div>
+                    </div>
+                  </div>
+                  <label class="toggle">
+                    <input type="checkbox" id="theme-toggle-check" onchange="handleThemeToggle(this)">
+                    <div class="toggle-track">
+                      <div class="toggle-thumb"></div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Account Info -->
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <h3 class="card-title">Account Information</h3>
+                  <p class="card-subtitle">Update your basic account details</p>
+                </div>
+              </div>
+              <div class="card-body">
+                <form onsubmit="saveAccountInfo(event)">
+                  <div class="form-group">
+                    <label class="form-label">Full Name</label>
+                    <input type="text" id="settings-name" class="form-control" placeholder="Your Full Name">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Email Address</label>
+                    <input type="email" id="settings-email" class="form-control" disabled style="opacity:0.6; cursor:not-allowed;">
+                    <p class="form-hint">Email cannot be changed.</p>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Phone</label>
+                    <input type="tel" id="settings-phone" class="form-control">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Location</label>
+                    <input type="text" id="settings-location" class="form-control">
+                  </div>
+                  <button type="submit" id="save-account-btn" class="btn btn-primary">Save Changes</button>
+                </form>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Right Column -->
+          <div style="display:flex; flex-direction:column; gap:24px;">
+
+            <!-- Change Password -->
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <h3 class="card-title">Change Password</h3>
+                  <p class="card-subtitle">Ensure your account uses a strong, unique password</p>
+                </div>
+              </div>
+              <div class="card-body">
+                <form onsubmit="changePassword(event)">
+                  <div class="form-group">
+                    <label class="form-label">Current Password <span class="required">*</span></label>
+                    <input type="password" id="curr-pass" class="form-control" placeholder="••••••••" required>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">New Password <span class="required">*</span></label>
+                    <input type="password" id="new-pass" class="form-control" placeholder="••••••••" minlength="6" required>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Confirm New Password <span class="required">*</span></label>
+                    <input type="password" id="confirm-pass" class="form-control" placeholder="••••••••" required>
+                  </div>
+                  <button type="submit" id="change-pass-btn" class="btn btn-primary">Update Password</button>
+                </form>
+              </div>
+            </div>
+
+            <!-- Quick Stats Card -->
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title">Your Stats</h3>
+              </div>
+              <div class="card-body" id="settings-stats" style="display:flex; flex-direction:column; gap:12px;">
+                <div class="skeleton" style="height:44px; border-radius:10px;"></div>
+                <div class="skeleton" style="height:44px; border-radius:10px;"></div>
+                <div class="skeleton" style="height:44px; border-radius:10px;"></div>
+              </div>
+            </div>
+
+            <!-- Danger Zone -->
+            <div class="card" style="border-color: rgba(239,68,68,0.2);">
+              <div class="card-header">
+                <div>
+                  <h3 class="card-title" style="color:var(--status-error-text);">Danger Zone</h3>
+                  <p class="card-subtitle">Irreversible actions</p>
+                </div>
+              </div>
+              <div class="card-body" style="display:flex; flex-direction:column; gap:12px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; padding:12px; background:var(--status-error-bg); border-radius:10px; border:1px solid rgba(239,68,68,0.2);">
+                  <div>
+                    <div style="font-weight:600; font-size:14px;">Delete Account</div>
+                    <div style="font-size:12px; color:var(--text-muted);">Permanently delete your account and all data.</div>
+                  </div>
+                  <button class="btn btn-danger btn-sm" onclick="confirmDeleteAccount()">Delete</button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/theme.js"></script>
+  <script src="js/settings.js"></script>
+</body>
+</html>

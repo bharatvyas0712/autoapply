@@ -1,0 +1,33 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from config import settings
+from repository import init_db
+from routes import router
+
+app = FastAPI(
+    title="AutoJobApply - Long-Term Memory Agent",
+    description="Vector memory store and learning engine coordinating histories and outcomes",
+    version="1.0.0"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(router)
+
+@app.on_event("startup")
+async def startup_event():
+    await init_db()
+
+@app.get("/health")
+async def health():
+    return {"success": True, "message": "Memory Agent running ✅"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=settings.AGENT_PORT, reload=False)

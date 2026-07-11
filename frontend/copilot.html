@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Career Copilot - AutoJobApply</title>
+  <link rel="stylesheet" href="css/main.css">
+  <style>
+    .grid-copilot {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .result-box {
+      background: rgba(0, 0, 0, 0.1);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 16px;
+      font-size: 13px;
+      margin-top: 12px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Sidebar -->
+    <div class="sidebar"></div>
+
+    <div class="main-content">
+      <!-- Topbar -->
+      <div class="topbar">
+        <button class="hamburger" onclick="document.querySelector('.sidebar').classList.toggle('open')">☰</button>
+        <div class="topbar-title">AI Career Copilot</div>
+        <div class="topbar-right">
+          <button class="theme-toggle-btn" onclick="toggleTheme()" title="Toggle Dark/Light Mode">🌓</button>
+        </div>
+      </div>
+
+      <!-- Page Body -->
+      <div class="page-body fade-in">
+        <div class="page-header">
+          <h1 style="font-size: 24px; font-weight: 700;">AI Career Advisor</h1>
+          <p>Optimize your resume, check ATS scores, generate career roadmaps, or practice in mock interview simulation rooms.</p>
+        </div>
+
+        <div class="grid-copilot">
+          <!-- Card 1: Resume Optimizer -->
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Resume Optimizer</h3>
+            </div>
+            <div class="card-body">
+              <div class="form-group">
+                <label class="form-label" for="res-text">Your Resume Text</label>
+                <textarea id="res-text" class="form-control" style="height:100px;" placeholder="Paste your resume text here..."></textarea>
+              </div>
+              <div class="form-group" style="margin-top:8px;">
+                <label class="form-label" for="res-keywords">Target Keywords (comma-separated)</label>
+                <input type="text" id="res-keywords" class="form-control" placeholder="Python, FastAPI, Kubernetes...">
+              </div>
+              <button class="btn btn-primary" onclick="copilotController.optimizeResume()" style="margin-top:10px;">Optimize Resume</button>
+              <div class="result-box" id="res-result"></div>
+            </div>
+          </div>
+
+          <!-- Card 2: ATS Score Checker -->
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">ATS Checker</h3>
+            </div>
+            <div class="card-body">
+              <div class="form-group">
+                <label class="form-label" for="ats-resume-text">Your Resume Text</label>
+                <textarea id="ats-resume-text" class="form-control" style="height:80px;" placeholder="Paste your resume text here..."></textarea>
+              </div>
+              <div class="form-group" style="margin-top:8px;">
+                <label class="form-label" for="ats-job-desc">Job Description Text</label>
+                <textarea id="ats-job-desc" class="form-control" style="height:80px;" placeholder="Paste target job description..."></textarea>
+              </div>
+              <button class="btn btn-primary" onclick="copilotController.checkAts()" style="margin-top:10px;">Check ATS Score</button>
+              <div class="result-box" id="ats-result"></div>
+            </div>
+          </div>
+
+          <!-- Card 3: Mock Interview Room -->
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Mock Interview Simulation</h3>
+            </div>
+            <div class="card-body">
+              <div class="form-group">
+                <label class="form-label" for="int-type">Interview Focus</label>
+                <select id="int-type" class="form-control">
+                  <option value="technical">Technical QA</option>
+                  <option value="behavioral">Behavioral / Leadership</option>
+                  <option value="coding">Coding & Algorithms</option>
+                </select>
+              </div>
+              <button class="btn btn-primary" onclick="copilotController.startInterview()" style="margin-top:10px;">Generate Questions</button>
+              <div class="result-box" id="int-result"></div>
+            </div>
+          </div>
+
+          <!-- Card 4: Salary Estimator -->
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Salary Predictor</h3>
+            </div>
+            <div class="card-body">
+              <div class="form-group">
+                <label class="form-label" for="sal-role">Target Role</label>
+                <input type="text" id="sal-role" class="form-control" placeholder="Senior Backend Developer">
+              </div>
+              <div class="form-group" style="margin-top:8px;">
+                <label class="form-label" for="sal-loc">Location</label>
+                <input type="text" id="sal-loc" class="form-control" placeholder="Remote / San Francisco">
+              </div>
+              <button class="btn btn-primary" onclick="copilotController.predictSalary()" style="margin-top:10px;">Calculate Expected Range</button>
+              <div class="result-box" id="sal-result"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Career Roadmap details full width card -->
+        <div class="card" style="margin-top:20px;">
+          <div class="card-header">
+            <h3 class="card-title">Target Career Roadmap Planner</h3>
+          </div>
+          <div class="card-body">
+            <div class="form-group">
+              <label class="form-label" for="map-current">Your Current Role</label>
+              <input type="text" id="map-current" class="form-control" style="max-width:300px;" placeholder="Software Developer">
+            </div>
+            <div class="form-group" style="margin-top:8px;">
+              <label class="form-label" for="map-target">Target Future Role</label>
+              <input type="text" id="map-target" class="form-control" style="max-width:300px;" placeholder="Principal Software Architect">
+            </div>
+            <button class="btn btn-primary" onclick="copilotController.generateRoadmap()" style="margin-top:10px;">Build Development Roadmaps</button>
+            <div class="result-box" id="map-result"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/theme.js"></script>
+  <script src="js/copilot.js"></script>
+</body>
+</html>

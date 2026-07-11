@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Profile Wizard - AutoJobApply</title>
+  <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Sidebar -->
+    <div class="sidebar"></div>
+
+    <div class="main-content">
+      <!-- Topbar -->
+      <div class="topbar">
+        <button class="hamburger" onclick="document.querySelector('.sidebar').classList.toggle('open')">☰</button>
+        <div class="topbar-title">Profile Wizard</div>
+        <div class="topbar-right">
+          <button class="theme-toggle-btn" onclick="toggleTheme()">🌓</button>
+        </div>
+      </div>
+
+      <div class="page-body fade-in">
+        <div class="page-header">
+          <h1>Complete Your Job Profile</h1>
+          <p>This information is used by the Playwright automation engine to fill job application forms.</p>
+        </div>
+
+        <!-- Step Indicator -->
+        <div class="steps">
+          <div class="step active" id="step-ind-1">
+            <div class="step-circle">1</div>
+            <div class="step-label">Upload PDF Resume</div>
+          </div>
+          <div class="step" id="step-ind-2">
+            <div class="step-circle">2</div>
+            <div class="step-label">Personal details</div>
+          </div>
+          <div class="step" id="step-ind-3">
+            <div class="step-circle">3</div>
+            <div class="step-label">Work & Education</div>
+          </div>
+          <div class="step" id="step-ind-4">
+            <div class="step-circle">4</div>
+            <div class="step-label">Questions & Defaults</div>
+          </div>
+        </div>
+
+        <!-- WIZARD STEP 1: RESUME UPLOAD -->
+        <div class="card wizard-step" id="step-1">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title">Upload Master Resume</h3>
+              <p class="card-subtitle">Upload your PDF resume. We will parse it to auto-fill the rest of this profile wizard!</p>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="drop-zone" id="resume-drop-zone" onclick="document.getElementById('resume-file').click()">
+              <div class="dz-icon">📄</div>
+              <div class="dz-text">Drag & Drop your resume here, or <span class="dz-link">browse</span></div>
+              <div class="dz-sub">Supports PDF, DOC, DOCX up to 10MB</div>
+              <input type="file" id="resume-file" style="display: none;" accept=".pdf,.doc,.docx" onchange="uploadResumeFile(event)">
+            </div>
+            
+            <div id="resume-upload-progress" class="fade-in" style="display: none; margin-top: 20px;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px;">
+                <span id="upload-status-text">Uploading and parsing PDF...</span>
+                <span id="upload-pct">0%</span>
+              </div>
+              <div class="progress-bar-wrap">
+                <div class="progress-bar-fill" id="upload-progress-fill" style="width: 0%;"></div>
+              </div>
+            </div>
+
+            <div id="resume-success-info" class="badge badge-green fade-in" style="display: none; margin-top: 16px; width: 100%; justify-content: center; padding: 12px;">
+              ✓ Resume uploaded & parsed successfully! Core fields populated.
+            </div>
+          </div>
+          <div class="card-footer">
+            <button class="btn btn-primary" onclick="goToStep(2)">Continue to Step 2 ➔</button>
+          </div>
+        </div>
+
+        <!-- WIZARD STEP 2: PERSONAL DETAILS -->
+        <div class="card wizard-step" id="step-2" style="display: none;">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title">Personal Details & Social Links</h3>
+              <p class="card-subtitle">Ensure contact detail accuracy for recruiters.</p>
+            </div>
+          </div>
+          <div class="card-body">
+            <div style="display: flex; gap: 24px; margin-bottom: 20px; flex-wrap: wrap;">
+              <!-- Photo Upload -->
+              <div style="text-align: center;">
+                <label class="form-label">Profile Photo</label>
+                <div style="width: 110px; height: 110px; border-radius: 12px; border: 1.5px solid var(--border-color); background: var(--bg-input); display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; margin-bottom: 10px;">
+                  <img id="profile-photo-preview" src="" style="width:100%; height:100%; object-fit:cover; display:none;">
+                  <span id="profile-photo-placeholder" style="font-size: 32px;">📷</span>
+                </div>
+                <input type="file" id="photo-file" style="display:none;" accept="image/*" onchange="uploadPhotoFile(event)">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('photo-file').click()">Change Photo</button>
+              </div>
+
+              <!-- Main Info -->
+              <div style="flex: 1; min-width: 280px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="form-group">
+                  <label class="form-label" for="profile-name">Full Name <span class="required">*</span></label>
+                  <input type="text" id="profile-name" class="form-control" required>
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="profile-phone">Phone Number <span class="required">*</span></label>
+                  <input type="tel" id="profile-phone" class="form-control" required>
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="profile-location">Location (City, Country) <span class="required">*</span></label>
+                  <input type="text" id="profile-location" class="form-control" placeholder="San Francisco, CA" required>
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="profile-headline">Professional Headline</label>
+                  <input type="text" id="profile-headline" class="form-control" placeholder="Full Stack Software Engineer">
+                </div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="profile-summary">Professional Summary / About Me</label>
+              <textarea id="profile-summary" class="form-control" placeholder="Experienced engineer specializing in React, Node.js, and automated deployment pipelines..."></textarea>
+            </div>
+
+            <div class="grid-3" style="margin-top: 20px;">
+              <div class="form-group">
+                <label class="form-label" for="profile-linkedin">LinkedIn Profile URL</label>
+                <input type="url" id="profile-linkedin" class="form-control" placeholder="https://linkedin.com/in/...">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="profile-github">GitHub Profile URL</label>
+                <input type="url" id="profile-github" class="form-control" placeholder="https://github.com/...">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="profile-portfolio">Portfolio / Personal Website</label>
+                <input type="url" id="profile-portfolio" class="form-control" placeholder="https://mywebsite.com">
+              </div>
+            </div>
+          </div>
+          <div class="card-footer">
+            <button class="btn btn-secondary" onclick="goToStep(1)">⬅ Back</button>
+            <button class="btn btn-primary" onclick="goToStep(3)">Continue to Step 3 ➔</button>
+          </div>
+        </div>
+
+        <!-- WIZARD STEP 3: WORK HISTORY & EDUCATION -->
+        <div class="card wizard-step" id="step-3" style="display: none;">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title">Professional Experience, Education & Skills</h3>
+              <p class="card-subtitle">Add details to fill standard ATS form sub-sections.</p>
+            </div>
+          </div>
+          <div class="card-body">
+            <!-- Skills Tag Input -->
+            <div class="form-group">
+              <label class="form-label" for="skills-input">Skills Tags (Comma-separated or Press Enter)</label>
+              <input type="text" id="skills-input" class="form-control" placeholder="React, Node.js, Python, MySQL, Git, AWS" onkeydown="handleSkillsKeydown(event)">
+              <div id="skills-tags-container" style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">
+                <!-- Tags populated via JS -->
+              </div>
+            </div>
+
+            <!-- Years Experience -->
+            <div class="grid-3" style="margin-bottom: 24px;">
+              <div class="form-group">
+                <label class="form-label" for="profile-exp-years">Total Years of Experience</label>
+                <input type="number" id="profile-exp-years" class="form-control" min="0" step="0.5" value="0">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="profile-curr-sal">Current Salary (Annual USD Equivalent)</label>
+                <input type="number" id="profile-curr-sal" class="form-control" placeholder="80000">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="profile-exp-sal">Expected Salary (Annual USD Equivalent)</label>
+                <input type="number" id="profile-exp-sal" class="form-control" placeholder="100000">
+              </div>
+            </div>
+
+            <!-- Work History List -->
+            <div style="margin-bottom: 24px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <label class="form-label" style="margin-bottom: 0;">Work History</label>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="addWorkHistoryItem()">+ Add Position</button>
+              </div>
+              <div id="work-history-list" style="display: flex; flex-direction: column; gap: 12px;">
+                <!-- Dynamically populated -->
+              </div>
+            </div>
+
+            <!-- Education List -->
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <label class="form-label" style="margin-bottom: 0;">Education</label>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="addEducationItem()">+ Add Degree</button>
+              </div>
+              <div id="education-list" style="display: flex; flex-direction: column; gap: 12px;">
+                <!-- Dynamically populated -->
+              </div>
+            </div>
+
+          </div>
+          <div class="card-footer">
+            <button class="btn btn-secondary" onclick="goToStep(2)">⬅ Back</button>
+            <button class="btn btn-primary" onclick="goToStep(4)">Continue to Step 4 ➔</button>
+          </div>
+        </div>
+
+        <!-- WIZARD STEP 4: CUSTOM Q&A & DEFAULTS -->
+        <div class="card wizard-step" id="step-4" style="display: none;">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title">Answers to Common Job Questions</h3>
+              <p class="card-subtitle">These defaults will automatically answer standard dropdown or Yes/No questions on job sites.</p>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="grid-2">
+              <div class="form-group">
+                <label class="form-label" for="pref-job-types">Job Types Preferred</label>
+                <select id="pref-job-types" class="form-control">
+                  <option value="full-time">Full-Time</option>
+                  <option value="remote">Remote Only</option>
+                  <option value="contract">Contract</option>
+                  <option value="internship">Internship</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="pref-notice">Notice Period (Days)</label>
+                <input type="number" id="pref-notice" class="form-control" min="0" value="0">
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 24px; margin: 18px 0;">
+              <label class="toggle">
+                <input type="checkbox" id="pref-relocate">
+                <div class="toggle-track">
+                  <div class="toggle-thumb"></div>
+                </div>
+                <span class="toggle-label">Willing to Relocate?</span>
+              </label>
+            </div>
+
+            <div class="divider"></div>
+
+            <h4 style="font-size: 14px; font-weight: 700; margin-bottom: 14px; color: var(--text-secondary);">Master Q&A Mappings</h4>
+            <div id="qa-mappings-container" style="display: flex; flex-direction: column; gap: 12px;">
+              <!-- Standard questions defaults -->
+              <div class="qa-item">
+                <div class="qa-question">Are you legally authorized to work in the country where this job is located?</div>
+                <div class="qa-options" data-qa-key="auth_work">
+                  <div class="qa-option selected" onclick="toggleQAOption(this, 'Yes')">Yes</div>
+                  <div class="qa-option" onclick="toggleQAOption(this, 'No')">No</div>
+                </div>
+              </div>
+
+              <div class="qa-item">
+                <div class="qa-question">Will you now or in the future require visa sponsorship?</div>
+                <div class="qa-options" data-qa-key="sponsorship">
+                  <div class="qa-option" onclick="toggleQAOption(this, 'Yes')">Yes</div>
+                  <div class="qa-option selected" onclick="toggleQAOption(this, 'No')">No</div>
+                </div>
+              </div>
+
+              <div class="qa-item">
+                <div class="qa-question">Do you require relocation assistance?</div>
+                <div class="qa-options" data-qa-key="relocation_assistance">
+                  <div class="qa-option" onclick="toggleQAOption(this, 'Yes')">Yes</div>
+                  <div class="qa-option selected" onclick="toggleQAOption(this, 'No')">No</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="card-footer">
+            <button class="btn btn-secondary" onclick="goToStep(3)">⬅ Back</button>
+            <button class="btn btn-primary" onclick="saveAllProfileData(event)">Save Profile & Finish</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/theme.js"></script>
+  <script src="js/profile.js"></script>
+</body>
+</html>

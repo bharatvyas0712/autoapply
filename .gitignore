@@ -1,0 +1,55 @@
+# Dependency directories
+node_modules/
+backend/node_modules/
+
+# Python virtual environments
+.venv/
+venv/
+automation/venv/
+python-venv/
+
+# Python caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+automation/__pycache__/
+
+# Sensitive configurations and secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+backend/.env
+automation/.env
+
+# Browser profiles (sensitive cookies/sessions)
+browser_profile/
+browser_profiles/
+automation/playwright_profile/
+
+# Logs and debug files
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+automation/logs/
+
+# IDE files
+.vscode/
+.idea/
+.claude/
+.agents/
+
+# Local/OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# App-specific uploaded files and database
+backend/uploads/
+backend/db/
+db.sqlite3

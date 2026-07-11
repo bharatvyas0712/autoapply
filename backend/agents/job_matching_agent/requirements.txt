@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+sqlalchemy
+aiomysql
+pydantic
+pydantic-settings
+sentence-transformers
+numpy
+scikit-learn
+python-dotenv

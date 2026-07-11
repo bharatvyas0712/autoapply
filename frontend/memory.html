@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Memory Dashboard - AutoJobApply</title>
+  <link rel="stylesheet" href="css/main.css">
+  <style>
+    .recommendation-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      background: var(--card-bg);
+      margin-bottom: 10px;
+    }
+    .recommendation-icon {
+      font-size: 18px;
+    }
+    .timeline-list {
+      position: relative;
+      padding-left: 20px;
+      border-left: 2px solid var(--border-color);
+    }
+    .timeline-node {
+      position: relative;
+      margin-bottom: 20px;
+    }
+    .timeline-node::before {
+      content: "";
+      position: absolute;
+      left: -26px;
+      top: 4px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #3b82f6;
+      border: 2px solid var(--card-bg);
+    }
+    .timeline-time {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .timeline-content {
+      font-size: 13px;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Sidebar -->
+    <div class="sidebar"></div>
+
+    <div class="main-content">
+      <!-- Topbar -->
+      <div class="topbar">
+        <button class="hamburger" onclick="document.querySelector('.sidebar').classList.toggle('open')">☰</button>
+        <div class="topbar-title">Long-Term Memory Dashboard</div>
+        <div class="topbar-right">
+          <button class="theme-toggle-btn" onclick="toggleTheme()" title="Toggle Dark/Light Mode">🌓</button>
+        </div>
+      </div>
+
+      <!-- Page Body -->
+      <div class="page-body fade-in">
+        <div class="page-header">
+          <h1 style="font-size: 24px; font-weight: 700;">Self-Learning Insights</h1>
+          <p>Explore statistics compiled from job outcomes, resume version performances, and memory recommendations.</p>
+        </div>
+
+        <!-- Metrics Grid -->
+        <div class="grid-4" style="margin-bottom: 28px;">
+          <div class="stat-card">
+            <div class="stat-icon blue">📦</div>
+            <div>
+              <div class="stat-number" id="stat-memories-count">0</div>
+              <div class="stat-label">Stored Facts</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon green">🎯</div>
+            <div>
+              <div class="stat-number" id="stat-interview-rate">0%</div>
+              <div class="stat-label">Interview Rate</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon orange">📄</div>
+            <div>
+              <div class="stat-number" id="stat-resumes-count">0</div>
+              <div class="stat-label">Resume Versions</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon red">🏢</div>
+            <div>
+              <div class="stat-number" id="stat-companies-count">0</div>
+              <div class="stat-label">Interacted Companies</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-3">
+          <!-- Recommendations -->
+          <div class="card" style="grid-column: span 2;">
+            <div class="card-header">
+              <h3 class="card-title">Recommendations Panel</h3>
+            </div>
+            <div class="card-body" id="recommendations-container">
+              <p style="color: var(--text-muted);">Calculating personalized suggestions...</p>
+            </div>
+          </div>
+
+          <!-- Resume performance histories -->
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Resume Versions</h3>
+            </div>
+            <div class="card-body" id="resumes-container">
+              <p style="color: var(--text-muted);">Loading resume performance versions...</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-2" style="margin-top: 28px;">
+          <!-- Application Timeline -->
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Application Timeline</h3>
+            </div>
+            <div class="card-body">
+              <div class="timeline-list" id="application-timeline">
+                <p style="color: var(--text-muted);">Loading timeline...</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Company History notes -->
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Interacted Companies Timeline</h3>
+            </div>
+            <div class="card-body">
+              <div class="timeline-list" id="companies-timeline">
+                <p style="color: var(--text-muted);">Loading timeline...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/theme.js"></script>
+  <script src="js/memory.js"></script>
+</body>
+</html>

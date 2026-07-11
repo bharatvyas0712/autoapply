@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Review & Apply - AutoJobApply</title>
+  <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+  <div class="app-layout">
+    <div class="sidebar"></div>
+
+    <div class="main-content">
+      <div class="topbar">
+        <button class="hamburger" onclick="document.querySelector('.sidebar').classList.toggle('open')">☰</button>
+        <div class="topbar-title">Review & Apply</div>
+        <div class="topbar-right">
+          <button class="theme-toggle-btn" onclick="toggleTheme()">🌓</button>
+        </div>
+      </div>
+
+      <div class="page-body fade-in">
+        <!-- Job Info Banner -->
+        <div class="card" id="job-info-banner" style="margin-bottom:24px; background: linear-gradient(135deg, rgba(255,153,0,0.08), rgba(20,110,180,0.06)); border-color: rgba(255,153,0,0.2);">
+          <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+            <div class="company-logo" id="job-logo" style="width:56px; height:56px; font-size:20px;">J</div>
+            <div style="flex:1;">
+              <h2 id="job-title-display" style="font-size:20px; font-weight:800;">Loading job details...</h2>
+              <p id="job-company-display" style="color:var(--text-secondary); margin-top:4px;"></p>
+            </div>
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+              <span class="badge badge-yellow" id="app-status-badge">Draft</span>
+              <a href="#" id="job-url-link" target="_blank" class="btn btn-secondary btn-sm">🔗 View Original</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- AI mode banner -->
+        <div style="background: linear-gradient(135deg, rgba(16,185,129,0.10), rgba(255,153,0,0.08)); border:1px solid rgba(16,185,129,0.35); border-radius:12px; padding:14px 18px; margin-bottom:24px; display:flex; gap:12px; align-items:flex-start;">
+          <span style="font-size:22px; flex-shrink:0;">🤖</span>
+          <div style="flex:1;">
+            <strong style="font-size:14px; color:#10b981;">AI Auto-Mode Active (Groq Llama)</strong>
+            <p style="font-size:13px; color:var(--text-secondary); margin-top:3px;">Groq AI ne aapke resume ke basis pe saare answers fill kar diye hain. <strong>"🤖 AI Auto-Submit"</strong> click karo — koi manual review nahi chahiye. Chahein toh koi bhi field edit kar sakte hain.</p>
+          </div>
+          <button class="btn btn-secondary btn-sm" id="ai-fill-btn" onclick="aiGenerateAnswers()" style="flex-shrink:0; white-space:nowrap;">🔄 Re-generate AI Answers</button>
+        </div>
+
+        <div class="grid-2" id="review-panels">
+          <!-- Left: Form Fields -->
+          <div>
+            <!-- Personal Info Section -->
+            <div class="card" style="margin-bottom:20px;">
+              <div class="review-section-title">Personal Information</div>
+              <div class="grid-2" style="gap:14px;">
+                <div class="form-group" style="margin-bottom:0;">
+                  <label class="form-label">First Name</label>
+                  <input type="text" id="field-first-name" class="form-control">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                  <label class="form-label">Last Name</label>
+                  <input type="text" id="field-last-name" class="form-control">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                  <label class="form-label">Email</label>
+                  <input type="email" id="field-email" class="form-control">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                  <label class="form-label">Phone</label>
+                  <input type="tel" id="field-phone" class="form-control">
+                </div>
+                <div class="form-group" style="margin-bottom:0; grid-column: span 2;">
+                  <label class="form-label">Location / City</label>
+                  <input type="text" id="field-location" class="form-control">
+                </div>
+              </div>
+            </div>
+
+            <!-- Professional Links -->
+            <div class="card" style="margin-bottom:20px;">
+              <div class="review-section-title">Professional Links</div>
+              <div style="display:flex; flex-direction:column; gap:12px;">
+                <div class="form-group" style="margin-bottom:0;">
+                  <label class="form-label">LinkedIn URL</label>
+                  <input type="url" id="field-linkedin" class="form-control">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                  <label class="form-label">GitHub URL</label>
+                  <input type="url" id="field-github" class="form-control">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                  <label class="form-label">Portfolio URL</label>
+                  <input type="url" id="field-portfolio" class="form-control">
+                </div>
+              </div>
+            </div>
+
+            <!-- Compensation -->
+            <div class="card" style="margin-bottom:20px;">
+              <div class="review-section-title">Compensation & Availability</div>
+              <div class="grid-2" style="gap:14px;">
+                <div class="form-group" style="margin-bottom:0;">
+                  <label class="form-label">Years of Experience</label>
+                  <input type="number" id="field-experience" class="form-control">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                  <label class="form-label">Notice Period (days)</label>
+                  <input type="number" id="field-notice" class="form-control">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                  <label class="form-label">Current Salary (USD)</label>
+                  <input type="number" id="field-curr-sal" class="form-control">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                  <label class="form-label">Expected Salary (USD)</label>
+                  <input type="number" id="field-exp-sal" class="form-control">
+                </div>
+                <div class="form-group" style="margin-bottom:0; grid-column: span 2;">
+                  <label class="form-label">Willing to Relocate?</label>
+                  <select id="field-relocate" class="form-control">
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Q&A + Cover Letter + Resume -->
+          <div>
+            <!-- Standard Yes/No Q&A -->
+            <div class="card" style="margin-bottom:20px;">
+              <div class="review-section-title">Automatic Question Answers</div>
+              <p style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">These answers will be used to fill in Yes/No questions, dropdowns, and common form inputs during automation.</p>
+              <div id="qa-review-container" style="display:flex; flex-direction:column; gap:10px;">
+                <!-- Injected via JS -->
+              </div>
+            </div>
+
+            <!-- Resume Selection -->
+            <div class="card" style="margin-bottom:20px;">
+              <div class="review-section-title">Resume to Upload</div>
+              <div id="resume-section">
+                <div id="resume-active" style="display:none;">
+                  <div style="display:flex; align-items:center; gap:12px; padding:12px; background:var(--bg-input); border-radius:10px; border:1px solid var(--border-color);">
+                    <span style="font-size:24px;">📄</span>
+                    <div style="flex:1;">
+                      <div id="resume-name" style="font-weight:600; font-size:13px;"></div>
+                      <div style="font-size:11px; color:var(--text-muted);">This resume will be uploaded to the form</div>
+                    </div>
+                    <span class="badge badge-green">Ready</span>
+                  </div>
+                </div>
+                <div id="resume-missing" style="text-align:center; padding:20px;">
+                  <span style="font-size:28px;">⚠️</span>
+                  <p style="font-size:13px; color:var(--status-warning-text); margin-top:8px;">No resume uploaded. <a href="profile.html?wizard=resume" class="dz-link">Upload one now.</a></p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Cover Letter -->
+            <div class="card" style="margin-bottom:20px;">
+              <div class="review-section-title">Cover Letter (Auto-Generated — Edit if Needed)</div>
+              <textarea id="field-cover-letter" class="form-control" style="min-height:220px; font-size:13px;"></textarea>
+            </div>
+
+            <!-- Review Notes -->
+            <div class="card" style="margin-bottom:20px;">
+              <div class="review-section-title">Internal Review Notes (Not Submitted)</div>
+              <textarea id="field-review-notes" class="form-control" placeholder="Add any personal notes or reminders about this application..." style="min-height:80px;"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- Submission Status -->
+        <div class="card" id="submission-status" style="display:none; margin-bottom:20px; text-align:center; padding:32px;">
+          <div id="status-spinner" class="spinner" style="margin: 0 auto 16px;"></div>
+          <h3 id="status-heading" style="font-size:18px; font-weight:700;">Submitting Application...</h3>
+          <p id="status-message" style="color:var(--text-secondary); margin-top:8px;">Playwright is opening the browser and filling in form fields. Please wait.</p>
+          <div class="progress-bar-wrap" style="max-width:400px; margin:20px auto 0;">
+            <div class="progress-bar-fill" id="submission-progress" style="width:20%;"></div>
+          </div>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="card" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+          <div>
+            <a href="jobs.html" class="btn btn-ghost">← Back to Jobs</a>
+          </div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button class="btn btn-secondary" onclick="saveReviewEdits()">💾 Save Draft</button>
+            <button class="btn btn-primary btn-lg" id="confirm-submit-btn" onclick="confirmAndSubmit()" style="background: linear-gradient(135deg,#146eb4,#0f4c81);">
+              🚀 Confirm &amp; Submit
+            </button>
+            <button class="btn btn-lg" id="ai-submit-btn" onclick="aiAutoSubmit()" style="background: linear-gradient(135deg,#10b981,#059669); color:#fff; font-weight:700; border:none; padding: 12px 24px; border-radius:10px; cursor:pointer; display:flex; align-items:center; gap:8px;">
+              🤖 AI Auto-Submit
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Success Modal -->
+  <div class="modal-overlay" id="success-modal">
+    <div class="modal" style="text-align:center; padding:40px;">
+      <div style="font-size:64px; margin-bottom:16px;">🎉</div>
+      <h2 style="font-size:24px; font-weight:800; margin-bottom:12px;">Application Submitted!</h2>
+      <p style="color:var(--text-secondary); margin-bottom:24px;">The Playwright automation engine successfully filled and submitted your job application. Check your email for confirmation.</p>
+      <div style="display:flex; gap:12px; justify-content:center;">
+        <a href="history.html" class="btn btn-primary">View History</a>
+        <a href="jobs.html" class="btn btn-secondary">Back to Jobs</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/theme.js"></script>
+  <script src="js/apply.js"></script>
+</body>
+</html>

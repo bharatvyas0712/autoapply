@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Carrier Jobs - AutoJobApply</title>
+  <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Sidebar -->
+    <div class="sidebar"></div>
+
+    <div class="main-content">
+      <!-- Topbar -->
+      <div class="topbar">
+        <button class="hamburger" onclick="document.querySelector('.sidebar').classList.toggle('open')">☰</button>
+        <div class="topbar-title">Carrier Jobs</div>
+        <div class="topbar-right">
+          <button class="theme-toggle-btn" onclick="toggleTheme()">🌓</button>
+        </div>
+      </div>
+
+      <div class="page-body fade-in">
+        <div class="page-header">
+          <div class="page-header-row">
+            <div>
+              <h1>Tracked Carrier Jobs</h1>
+              <p>Add URLs manually or browse extracted jobs from company career portals.</p>
+            </div>
+            <button class="btn btn-primary" onclick="openAddJobModal()">+ Add Custom Job Link</button>
+          </div>
+        </div>
+
+        <!-- Discover Jobs Search Bar -->
+        <div class="card" style="margin-bottom: 24px; padding: 16px; background: linear-gradient(135deg, rgba(20,110,180,0.06), rgba(255,153,0,0.08)); border-color: rgba(20,110,180,0.2);">
+          <div style="font-weight: 700; margin-bottom: 12px; font-size: 14px;">🔍 Discover New Jobs (LinkedIn Public Search)</div>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+            <input type="text" id="discover-query" class="form-control" placeholder="Job Title (e.g. Software Engineer)" style="flex: 2; min-width: 200px;">
+            <input type="text" id="discover-location" class="form-control" placeholder="Location (e.g. Remote or New York)" style="flex: 1; min-width: 150px;">
+            <button class="btn btn-primary" id="discover-btn" onclick="discoverJobs()">Search Jobs</button>
+          </div>
+          <div id="discover-results" style="margin-top: 16px; display: none;">
+            <!-- Injected via JS -->
+          </div>
+        </div>
+
+        <!-- Filter bar -->
+        <div class="filter-bar">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="job-search" placeholder="Search by job title, company..." oninput="filterJobs()">
+          </div>
+          
+          <select id="status-filter" class="form-control" style="width: auto;" onchange="filterJobs()">
+            <option value="">All Statuses</option>
+            <option value="pending">Pending</option>
+            <option value="saved">Saved</option>
+            <option value="applied">Applied</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </div>
+
+        <!-- Jobs Grid Container -->
+        <div class="jobs-grid" id="jobs-container">
+          <!-- Injected dynamically -->
+          <div style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); padding: 48px;">
+            <span class="spinner" style="margin: 0 auto 12px;"></span>
+            Loading job listings...
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Job Modal -->
+  <div class="modal-overlay" id="add-job-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">Track Custom Job URL</h3>
+        <button class="modal-close" onclick="closeAddJobModal()">✕</button>
+      </div>
+      <form id="add-job-form" onsubmit="handleSaveJob(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label" for="add-job-url">Job Link / Career URL <span class="required">*</span></label>
+            <input type="url" id="add-job-url" class="form-control" placeholder="https://careers.company.com/job/123" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="add-job-title">Job Title</label>
+            <input type="text" id="add-job-title" class="form-control" placeholder="Frontend Developer (Leave blank to scrape)">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="add-job-company">Company</label>
+            <input type="text" id="add-job-company" class="form-control" placeholder="e.g. Google">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="add-job-location">Location</label>
+            <input type="text" id="add-job-location" class="form-control" placeholder="Remote / New York, NY">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeAddJobModal()">Cancel</button>
+          <button type="submit" id="save-job-btn" class="btn btn-primary">Add Job</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/theme.js"></script>
+  <script src="js/jobs.js"></script>
+</body>
+</html>

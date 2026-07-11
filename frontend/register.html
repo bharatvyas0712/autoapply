@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Register - AutoJobApply Portal</title>
+  <link rel="stylesheet" href="css/main.css">
+  <meta name="description" content="Register an account for the AutoJobApply portal.">
+</head>
+<body>
+  <div class="auth-page">
+    <!-- Left Hero Section -->
+    <div class="auth-left">
+      <div class="auth-hero fade-in">
+        <h1>Join the Future of Job Searching</h1>
+        <p>Set up your profile, upload your resume, and start applying to hundreds of developer and tech jobs with one click.</p>
+        
+        <div class="auth-features" style="margin-top: 36px;">
+          <div class="auth-feature">
+            <span class="feat-icon">📂</span>
+            <span class="feat-text"><strong>Resume Auto-Parsing:</strong> PDFs are automatically read to build your profile.</span>
+          </div>
+          <div class="auth-feature">
+            <span class="feat-icon">🌐</span>
+            <span class="feat-text"><strong>Multi-User Isolation:</strong> Secure and private database fields per user.</span>
+          </div>
+          <div class="auth-feature">
+            <span class="feat-icon">🖥️</span>
+            <span class="feat-text"><strong>Full Transparent Logs:</strong> See every step the browser performs in real time.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Register Form Section -->
+    <div class="auth-right slide-in">
+      <div class="auth-form-header">
+        <div class="auth-logo">
+          <div class="auth-logo-icon">a</div>
+          <h2 style="font-size: 20px; font-weight: 700; color: var(--text-primary);">AutoJobApply</h2>
+        </div>
+        <h2>Create Account</h2>
+        <p>Get started with your automatic job application assistant.</p>
+      </div>
+
+      <form id="register-form" onsubmit="handleRegister(event)">
+        <div class="form-group">
+          <label class="form-label" for="fullname">Full Name <span class="required">*</span></label>
+          <div class="input-group">
+            <span class="input-icon">👤</span>
+            <input type="text" id="fullname" class="form-control" placeholder="John Doe" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="email">Email Address <span class="required">*</span></label>
+          <div class="input-group">
+            <span class="input-icon">✉️</span>
+            <input type="email" id="email" class="form-control" placeholder="john.doe@example.com" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="password">Password <span class="required">*</span></label>
+          <div class="input-group">
+            <span class="input-icon">🔒</span>
+            <input type="password" id="password" class="form-control" placeholder="••••••••" minlength="6" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="phone">Phone Number</label>
+          <div class="input-group">
+            <span class="input-icon">📞</span>
+            <input type="tel" id="phone" class="form-control" placeholder="+1 (555) 000-0000">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="location">Location</label>
+          <div class="input-group">
+            <span class="input-icon">📍</span>
+            <input type="text" id="location" class="form-control" placeholder="New York, NY">
+          </div>
+        </div>
+
+        <button type="submit" id="submit-btn" class="btn btn-primary btn-full btn-lg" style="margin-top: 12px;">
+          Create Account
+        </button>
+
+        <div class="divider-text" style="margin: 24px 0;">Already have an account?</div>
+
+        <a href="index.html" class="btn btn-secondary btn-full">
+          Sign In
+        </a>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/theme.js"></script>
+  <script src="js/auth.js"></script>
+</body>
+</html>
