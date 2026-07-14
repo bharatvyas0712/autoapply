@@ -95,7 +95,7 @@ def _fetch_full_description(page, url: str, selectors: list, timeout: int = 1500
     return ""
 
 
-def search_linkedin_jobs(query: str, location: str, limit: int = 10) -> list:
+def search_linkedin_jobs(query: str, location: str, limit: int = 10, experience_level: str = "", job_type: str = "") -> list:
     results = []
     base_url = "https://www.linkedin.com/jobs/search/"
     params = {
@@ -103,6 +103,7 @@ def search_linkedin_jobs(query: str, location: str, limit: int = 10) -> list:
         "location": location,
         "f_TPR": "r2592000"
     }
+
     search_url = f"{base_url}?{urllib.parse.urlencode(params)}"
 
     with sync_playwright() as p:
@@ -133,6 +134,10 @@ def search_linkedin_jobs(query: str, location: str, limit: int = 10) -> list:
                     title = title_el.inner_text().strip() if title_el else "Unknown Title"
                     company = company_el.inner_text().strip() if company_el else "Unknown Company"
                     loc = location_el.inner_text().strip() if location_el else location
+
+                    # Apply local experience and job type filters
+                    if not _job_matches_filters(title, "", experience_level, job_type):
+                        continue
 
                     url = link_el.get_attribute('href') if link_el else search_url
                     if url and '?' in url:
@@ -170,30 +175,10 @@ def search_linkedin_jobs(query: str, location: str, limit: int = 10) -> list:
     return results
 
 def search_indeed_jobs(query: str, location: str, limit: int = 15, easy_apply_only: bool = False,
-                        exclude_urls: set = None, max_pages: int = 4):
+                        exclude_urls: set = None, max_pages: int = 4, experience_level: str = "", job_type: str = ""):
     """
     Search public Indeed job listings without logging in.
-
-    NOTE: Indeed has aggressive anti-bot protection. This runs a real
-    (headed-capable) Chromium and grabs whatever job cards render. If Indeed
-    serves a captcha / block page, this returns an empty list gracefully — the
-    caller should treat an empty result as "blocked or nothing found".
-
-    easy_apply_only: when True, skips jobs that redirect to the employer's own
-    site to apply ("Apply on company site") and keeps only jobs that use
-    Indeed's own native apply flow ("Easily apply" / Indeed Apply widget).
-
-    exclude_urls: job_urls to skip (e.g. jobs you've already seen/tracked) —
-    without this, every run just re-scrapes Indeed's page 1 and shows the
-    exact same top results every time. When set, this pages forward
-    (Indeed's `start` offset, 10 results/page) up to `max_pages` pages until
-    it collects `limit` NEW jobs or runs out of pages.
-
-    Returns:
-        (results: list, excluded_count: int) — excluded_count is how many
-        matching jobs were skipped only because they were already in
-        exclude_urls, so the caller can tell "genuinely nothing found /
-        blocked" apart from "found matches but you've already seen them all".
+    ...
     """
     exclude_urls = exclude_urls or set()
     results = []
@@ -221,6 +206,7 @@ def search_indeed_jobs(query: str, location: str, limit: int = 15, easy_apply_on
                     break
 
                 params = {"q": query, "l": location, "sort": "date"}
+                
                 if page_num > 0:
                     params["start"] = page_num * 10
                 search_url = f"{domain}/jobs?{urllib.parse.urlencode(params)}"
@@ -262,6 +248,10 @@ def search_indeed_jobs(query: str, location: str, limit: int = 15, easy_apply_on
                         company = company_el.inner_text().strip() if company_el else "Unknown Company"
                         loc = location_el.inner_text().strip() if location_el else location
                         snippet = snippet_el.inner_text().strip() if snippet_el else ""
+
+                        # Apply local experience and job type filters
+                        if not _job_matches_filters(title, snippet, experience_level, job_type):
+                            continue
 
                         job_url = ""
                         if link_el:
@@ -319,6 +309,159 @@ def search_indeed_jobs(query: str, location: str, limit: int = 15, easy_apply_on
     return results, excluded_count
 
 
+def search_naukri_jobs(query: str, location: str, limit: int = 15, 
+                        exclude_urls: set = None, max_pages: int = 4, experience_level: str = "", job_type: str = ""):
+    """
+    Search public Naukri job listings using Playwright.
+    """
+    exclude_urls = exclude_urls or set()
+    results = []
+    seen_this_run = set()
+    excluded_count = 0
+
+    q_fmt = (query or "").replace(" ", "-").lower()
+    l_fmt = (location or "").replace(" ", "-").lower()
+    
+    if not q_fmt and not l_fmt:
+        base_url_path = "jobs"
+    elif q_fmt and not l_fmt:
+        base_url_path = f"{q_fmt}-jobs"
+    elif not q_fmt and l_fmt:
+        base_url_path = f"jobs-in-{l_fmt}"
+    else:
+        base_url_path = f"{q_fmt}-jobs-in-{l_fmt}"
+
+    domain = "https://www.naukri.com"
+    
+    with sync_playwright() as p:
+        browser = p.chromium.launch(
+            headless=False,
+            args=[
+                '--disable-blink-features=AutomationControlled',
+                '--window-position=-3000,-3000'
+            ]
+        )
+        ctx = browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                       "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            locale="en-US",
+            viewport={"width": 1280, "height": 900},
+        )
+        page = ctx.new_page()
+
+        try:
+            for page_num in range(1, max_pages + 1):
+                if len(results) >= limit:
+                    break
+
+                search_url = f"{domain}/{base_url_path}"
+                if page_num > 1:
+                    search_url += f"-{page_num}"
+                
+                query_params = []
+                if experience_level == 'fresher':
+                    query_params.append("experience=0")
+                elif experience_level == 'entry':
+                    query_params.append("experience=1")
+                elif experience_level == 'mid':
+                    query_params.append("experience=3")
+                elif experience_level == 'senior':
+                    query_params.append("experience=6")
+                
+                if query_params:
+                    search_url += "?" + "&".join(query_params)
+                
+                page.goto(search_url, timeout=35000, wait_until="domcontentloaded")
+                page.wait_for_timeout(3500)
+
+                title_lower = (page.title() or "").lower()
+                if "access denied" in title_lower or any(hint in title_lower for hint in _BLOCK_TITLE_HINTS):
+                    print(f"Blocked by Naukri anti-bot at page {page_num}.")
+                    break
+
+                card_selectors = [
+                    'article.jobTuple',
+                    '.srp-jobtuple-wrapper',
+                    'div.jobTuple',
+                    'div[data-job-id]'
+                ]
+                
+                cards = []
+                for sel in card_selectors:
+                    cards = page.query_selector_all(sel)
+                    if cards:
+                        break
+
+                if not cards:
+                    break
+
+                for card in cards:
+                    if len(results) >= limit:
+                        break
+                    try:
+                        title_el = (card.query_selector('a.title') or card.query_selector('.title'))
+                        company_el = (card.query_selector('a.comp-name') or card.query_selector('.subTitle') or card.query_selector('.company'))
+                        location_el = (card.query_selector('.locWdth') or card.query_selector('.location'))
+                        snippet_el = (card.query_selector('.job-description') or card.query_selector('.ellipsis.job-description'))
+                        exp_el = card.query_selector('.expwdth') or card.query_selector('.exp-wrap')
+                        
+                        title = title_el.inner_text().strip() if title_el else "Unknown Title"
+                        company = company_el.inner_text().strip() if company_el else "Unknown Company"
+                        loc = location_el.inner_text().strip() if location_el else location
+                        snippet = snippet_el.inner_text().strip() if snippet_el else ""
+                        exp_text = exp_el.inner_text().strip() if exp_el else ""
+
+                        if exp_text:
+                            snippet = f"[Experience: {exp_text}] {snippet}"
+
+                        if not _job_matches_filters(title, snippet, experience_level, job_type):
+                            continue
+
+                        job_url = ""
+                        if title_el:
+                            href = title_el.get_attribute('href')
+                            if href:
+                                job_url = href if href.startswith('http') else f"{domain}{href}"
+
+                        if not job_url or job_url in seen_this_run:
+                            continue
+                        seen_this_run.add(job_url)
+
+                        if job_url in exclude_urls:
+                            excluded_count += 1
+                            continue
+
+                        results.append({
+                            "title": title,
+                            "company": company,
+                            "location": loc,
+                            "job_url": job_url,
+                            "description": snippet,
+                            "source": "naukri",
+                            "job_type": "full-time",
+                            "easy_apply": False,
+                        })
+                    except Exception as e:
+                        print(f"Error extracting Naukri card: {e}")
+                        continue
+                        
+                page.wait_for_timeout(2000)
+
+            for job in results:
+                full_desc = _fetch_full_description(page, job["job_url"], ['.job-desc', '.dang-inner-html', '.jobDesc'])
+                if full_desc is None:
+                    break
+                if full_desc:
+                    job["description"] = full_desc
+                    
+        except Exception as e:
+            print(f"Error during Naukri search: {e}")
+        finally:
+            browser.close()
+
+    return results, excluded_count
+
+
 def _card_is_easy_apply(card) -> bool:
     try:
         text = (card.inner_text() or "").lower()
@@ -345,7 +488,112 @@ def _title_matches(title: str, keywords: list) -> bool:
     return any(kw in t for kw in keywords)
 
 
-def search_ats_jobs(query: str, location: str, limit: int = 25) -> list:
+# ---------------------------------------------------------------------------
+# Experience-level keyword signals
+# ---------------------------------------------------------------------------
+SENIOR_KEYWORDS_RE = re.compile(
+    r'\b(senior|sr|lead|principal|director|vp|manager|architect|staff|head)\b',
+    re.IGNORECASE
+)
+JUNIOR_KEYWORDS_RE = re.compile(r'\b(junior|jr)\b', re.IGNORECASE)
+FRESHER_KEYWORDS_RE = re.compile(
+    r'\b(fresher|fresh graduate|graduate trainee|trainee|campus hire|'
+    r'0[\s-]*1\s*years?|no experience required)\b',
+    re.IGNORECASE
+)
+ENTRY_KEYWORDS_RE = re.compile(r'\b(entry[\s-]?level|entry level|associate)\b', re.IGNORECASE)
+
+# Matches things like "2-4 years", "3+ years", "5 years of experience",
+# "at least 2 years". Used to pull the minimum years-of-experience figure
+# a posting asks for, so we can bucket by experience_level accurately
+# instead of relying on title keywords alone (which "fresher" vs "entry"
+# previously did — identically and incorrectly).
+_YEARS_RE = re.compile(
+    r'(\d+)\s*(?:\+|to|-)?\s*(?:\d+)?\s*\+?\s*years?\s*(?:of\s*)?(?:experience|exp)?',
+    re.IGNORECASE
+)
+
+
+def _min_years_required(text: str):
+    """
+    Pulls the smallest 'N years' figure mentioned in a job title/description.
+    Returns None if no such figure is found (so we don't wrongly reject
+    postings that just never state a number).
+    """
+    if not text:
+        return None
+    matches = [int(m) for m in _YEARS_RE.findall(text) if m]
+    return min(matches) if matches else None
+
+
+def _job_matches_filters(title: str, description: str, experience_level: str, job_type: str) -> bool:
+    title_lower = title.lower()
+    desc_lower = description.lower()
+    combined = f"{title_lower} {desc_lower}"
+    min_years = _min_years_required(combined)
+
+    is_senior_kw = bool(SENIOR_KEYWORDS_RE.search(title))
+    is_junior_kw = bool(JUNIOR_KEYWORDS_RE.search(title))
+    is_fresher_kw = bool(FRESHER_KEYWORDS_RE.search(combined))
+    is_entry_kw = bool(ENTRY_KEYWORDS_RE.search(combined))
+
+    # 1. Experience Level filter
+    if experience_level == 'fresher':
+        # Fresher = 0-1 yrs. Reject senior-sounding titles and anything
+        # explicitly asking for 2+ years of experience.
+        if is_senior_kw:
+            return False
+        if min_years is not None and min_years >= 2:
+            return False
+        # Require a positive fresher/entry/junior/graduate signal, unless
+        # the posting simply never states a years figure (common for
+        # fresher-friendly roles).
+        if min_years is None and not (is_fresher_kw or is_entry_kw or is_junior_kw):
+            if not re.search(r'\b(graduate|associate|jr)\b', title_lower):
+                return False
+
+    elif experience_level == 'entry':
+        # Entry-level = up to ~2 yrs. Distinct from 'fresher': allows a
+        # bit more experience, still excludes senior roles.
+        if is_senior_kw:
+            return False
+        if min_years is not None and min_years > 2:
+            return False
+
+    elif experience_level == 'mid':
+        if is_fresher_kw or is_junior_kw:
+            return False
+        if any(w in title_lower for w in ('director', 'vp', 'executive', 'chief')):
+            return False
+        if min_years is not None and (min_years < 2 or min_years > 6):
+            return False
+
+    elif experience_level == 'senior':
+        if is_junior_kw or is_fresher_kw:
+            return False
+        if not is_senior_kw:
+            has_sr_desc = min_years is not None and min_years >= 5
+            if not has_sr_desc:
+                return False
+
+    # 2. Job Type filter
+    if job_type == 'full-time':
+        if 'intern' in title_lower and 'full-time' not in title_lower:
+            return False
+    elif job_type == 'part-time':
+        if 'part-time' not in title_lower and 'part-time' not in desc_lower and 'part time' not in title_lower and 'part time' not in desc_lower:
+            return False
+    elif job_type == 'contract':
+        if not any(w in title_lower or w in desc_lower for w in ('contract', 'freelance', 'temp', 'temporary')):
+            return False
+    elif job_type == 'internship':
+        if 'intern' not in title_lower and 'intern' not in desc_lower:
+            return False
+
+    return True
+
+
+def search_ats_jobs(query: str, location: str, limit: int = 25, experience_level: str = "", job_type: str = "") -> list:
     results = []
     keywords = _query_keywords(query)
     headers = {"User-Agent": "AutoJobApply/1.0 (+https://localhost)"}
@@ -366,6 +614,11 @@ def search_ats_jobs(query: str, location: str, limit: int = 25) -> list:
                 if not _location_matches(loc, location):
                     continue
                 content = re.sub(r'<[^>]+>', ' ', job.get('content', '') or '')[:1500]
+                
+                # Apply local filters
+                if not _job_matches_filters(title, content, experience_level, job_type):
+                    continue
+                
                 results.append({
                     "title": title,
                     "company": company.capitalize(),
@@ -396,12 +649,18 @@ def search_ats_jobs(query: str, location: str, limit: int = 25) -> list:
                 loc = (job.get('categories') or {}).get('location', '') or location
                 if not _location_matches(loc, location):
                     continue
+                desc = (job.get('descriptionPlain', '') or '')[:1500]
+                
+                # Apply local filters
+                if not _job_matches_filters(title, desc, experience_level, job_type):
+                    continue
+                
                 results.append({
                     "title": title,
                     "company": company.capitalize(),
                     "location": loc,
                     "job_url": job.get('hostedUrl', ''),
-                    "description": (job.get('descriptionPlain', '') or '')[:1500],
+                    "description": desc,
                     "source": "lever",
                     "job_type": "full-time",
                 })

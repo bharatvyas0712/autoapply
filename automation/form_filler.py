@@ -14,6 +14,7 @@ import re
 import time
 import json
 import base64
+import shutil
 import threading
 import traceback
 import requests
@@ -29,7 +30,7 @@ GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
 # ──────────────────────────────────────────────────────────────────────────────
 # CONFIG — all pause/timeout knobs are env-configurable, no hardcoded magic numbers
 # ──────────────────────────────────────────────────────────────────────────────
-LOGIN_WAIT_TIMEOUT_SECONDS = int(os.environ.get("AUTOJOBAPPLY_LOGIN_WAIT_SECONDS", 600))          # 10 min
+LOGIN_WAIT_TIMEOUT_SECONDS = int(os.environ.get("AUTOJOBAPPLY_LOGIN_WAIT_SECONDS", 60))          # 1 min
 LOGIN_POLL_INTERVAL_SECONDS = int(os.environ.get("AUTOJOBAPPLY_LOGIN_POLL_INTERVAL_SECONDS", 3))
 FIELD_REVIEW_TIMEOUT_SECONDS = int(os.environ.get("AUTOJOBAPPLY_FIELD_REVIEW_TIMEOUT_SECONDS", 900))  # 15 min
 REVIEW_POLL_INTERVAL_SECONDS = int(os.environ.get("AUTOJOBAPPLY_REVIEW_POLL_INTERVAL_SECONDS", 5))
@@ -44,9 +45,19 @@ REVIEW_POLL_INTERVAL_SECONDS = int(os.environ.get("AUTOJOBAPPLY_REVIEW_POLL_INTE
 _profile_locks = {}
 _profile_locks_lock = threading.Lock()
 
-def _get_profile_lock(user_id: int = None) -> threading.Lock:
-    """Get or create a lock for a specific user's browser profile."""
-    profile_key = user_id if user_id else "default"
+def _get_profile_lock(user_id: int = None, session_id: int = None) -> threading.Lock:
+    """
+    Get or create a lock for a browser profile.
+    When session_id is given, the lock is session-scoped — enabling parallel
+    applications for the same user with full profile isolation.
+    Falls back to user-level locking when session_id is absent.
+    """
+    if session_id:
+        profile_key = f"session_{session_id}"
+    elif user_id:
+        profile_key = f"user_{user_id}"
+    else:
+        profile_key = "default"
     with _profile_locks_lock:
         if profile_key not in _profile_locks:
             _profile_locks[profile_key] = threading.Lock()
@@ -237,6 +248,11 @@ def analyze_form_fields(url: str) -> list:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+class OneClickApplySuccess(Exception):
+    """Raised when a job board 1-click apply completes without needing a form."""
+    pass
+
+# ──────────────────────────────────────────────────────────────────────────────
 # FILL AND SUBMIT FORM
 # ──────────────────────────────────────────────────────────────────────────────
 def fill_and_submit_form(
@@ -247,7 +263,8 @@ def fill_and_submit_form(
     resume_path: str = None,
     user_id: int = None,
     job_id: int = None,
-    resume_text: str = ""
+    resume_text: str = "",
+    session_id: int = None
 ) -> dict:
     """
     Thin wrapper that serializes access to the user's browser profile (see
@@ -255,7 +272,7 @@ def fill_and_submit_form(
     only one real browser run can use the same profile at a time.
     Different users can run in parallel with separate profiles.
     """
-    profile_lock = _get_profile_lock(user_id)
+    profile_lock = _get_profile_lock(user_id=user_id, session_id=session_id)
     wait_start = time.time()
     if profile_lock.locked():
         logger.info(f"Another application for user {user_id or 'default'} is using the browser profile — waiting for it to finish...")
@@ -264,7 +281,7 @@ def fill_and_submit_form(
         if waited > 1:
             logger.info(f"Acquired the browser profile for user {user_id or 'default'} after waiting {waited:.0f}s.")
         return _fill_and_submit_form_impl(
-            url, form_data, custom_qa, cover_letter, resume_path, user_id, job_id, resume_text
+            url, form_data, custom_qa, cover_letter, resume_path, user_id, job_id, resume_text, session_id
         )
 
 
@@ -276,7 +293,8 @@ def _fill_and_submit_form_impl(
     resume_path: str = None,
     user_id: int = None,
     job_id: int = None,
-    resume_text: str = ""
+    resume_text: str = "",
+    session_id: int = None
 ) -> dict:
     """
     Navigate to the job application URL and:
@@ -297,7 +315,8 @@ def _fill_and_submit_form_impl(
     steps_total = 10
 
     def add_log(msg, status="ok"):
-        log.append({"time": datetime.now().isoformat(), "message": msg, "status": status})
+        log_entry = {"time": datetime.now().isoformat(), "message": msg, "status": status}
+        log.append(log_entry)
         if status == "ok":
             logger.info(msg)
         elif status == "warn":
@@ -307,12 +326,28 @@ def _fill_and_submit_form_impl(
         else:
             logger.debug(msg)
 
+        if session_id:
+            try:
+                backend_url = os.environ.get("BACKEND_API_URL", "http://localhost:3000")
+                requests.post(
+                    f"{backend_url}/api/applications/sessions/{session_id}/log",
+                    json={
+                        "log_entry": log_entry,
+                        "steps_completed": steps_done,
+                        "steps_total": steps_total
+                    },
+                    timeout=5
+                )
+            except Exception as e:
+                logger.warning(f"Failed to push log to backend: {e}")
+
     with sync_playwright() as p:
         # Use the ONE shared, logged-in profile so we reuse the sessions you
         # already established on LinkedIn / Indeed / etc. — no re-login.
-        ctx = launch_logged_in_context(p, headless=False, slow_mo=300, user_id=user_id)
+        ctx = launch_logged_in_context(p, headless=False, slow_mo=300, user_id=user_id, session_id=session_id)
         page = ctx.new_page()
 
+        did_manual_login = False
         try:
             add_log(f"Opening URL: {url}")
             page.goto(
@@ -347,12 +382,16 @@ def _fill_and_submit_form_impl(
                     if not _is_login_wall(target_page):
                         add_log("Login detected complete — resuming form fill.")
                         target_page.wait_for_timeout(2000)
-                        return True
+                        return "manual_login"
                 add_log(f"Timeout reached after {LOGIN_WAIT_TIMEOUT_SECONDS}s waiting for manual login.", "error")
                 return False
 
-            if not wait_for_login(page):
+            login_res = wait_for_login(page)
+            if not login_res:
                 return {"success": False, "status": "login_timeout", "message": "Manual login required but timed out.", "log": log, "steps_done": steps_done, "steps_total": steps_total}
+            
+            if login_res == "manual_login":
+                did_manual_login = True
 
             # ── Reach the real application form ────────────────────────────
             # Job-board URLs (LinkedIn "jobs/view/...", Indeed "viewjob?...") land
@@ -361,11 +400,15 @@ def _fill_and_submit_form_impl(
             # Direct ATS links (Greenhouse/Lever) already ARE the form, so this is
             # a no-op for those (detected by already having fillable fields).
             
-            # Check if this is a known multi-step wizard URL (LinkedIn/Indeed)
+            # Check if this is a known multi-step wizard URL (LinkedIn/Indeed/Naukri)
             url_lower = url.lower()
             is_multi_step_url = any(pattern in url_lower for pattern in KNOWN_LISTING_URL_PATTERNS)
             
-            page = _click_apply_and_switch(ctx, page, add_log, is_multi_step=is_multi_step_url)
+            try:
+                page = _click_apply_and_switch(ctx, page, add_log, is_multi_step=is_multi_step_url)
+            except OneClickApplySuccess:
+                return {"success": True, "message": "Naukri 1-click apply was successful!", "log": log, "steps_done": steps_total, "steps_total": steps_total}
+            
             if not wait_for_login(page):
                 return {"success": False, "message": "Manual login required but timed out.", "log": log, "steps_done": steps_done, "steps_total": steps_total}
             
@@ -374,9 +417,9 @@ def _fill_and_submit_form_impl(
                 add_log("CAPTCHA/anti-bot challenge detected after clicking Apply! Application blocked.", "error")
                 return {"success": False, "status": "captcha_blocked", "message": "CAPTCHA challenge detected - manual intervention required", "log": log, "steps_done": steps_done, "steps_total": steps_total}
             
-            # Handle multi-step wizard for LinkedIn/Indeed
+            # Handle multi-step wizard for LinkedIn/Indeed/Naukri
             if is_multi_step_url and _is_multi_step_wizard(page):
-                add_log("Detected multi-step modal wizard (LinkedIn Easy Apply / Indeed Apply) - entering wizard mode")
+                add_log("Detected multi-step modal wizard (LinkedIn / Indeed / Naukri) - entering wizard mode")
                 wizard_success = _fill_multi_step_wizard(page, form_data, custom_qa, cover_letter, resume_path, add_log, user_id, job_id, resume_text)
                 if not wizard_success:
                     add_log("Multi-step wizard failed - proceeding with standard form fill", "warn")
@@ -398,7 +441,7 @@ def _fill_and_submit_form_impl(
             add_log("Filling standard text fields...")
             field_map = build_field_map(form_data, cover_letter)
 
-            # type="search" is excluded: job boards (Greenhouse, LinkedIn, Indeed, ...)
+            # type="search" is excluded: job boards (Greenhouse, LinkedIn, Indeed, Naukri, ...)
             # all carry their own site-search box unrelated to the application —
             # without this it gets mistaken for an unmapped application question.
             inputs = form_context.query_selector_all('input:not([type="hidden"]):not([type="submit"]):not([type="file"]):not([type="search"]), textarea')
@@ -416,14 +459,17 @@ def _fill_and_submit_form_impl(
 
                     matched_value = match_field_value(label_text, inp.get_attribute('name') or '', inp.get_attribute('placeholder') or '', field_map)
 
-                    if matched_value is not None and matched_value != "":
+                    if matched_value == "__SKIP__":
+                        add_log(f"  Explicitly skipping '{label_text}'")
+                        continue
+                    elif matched_value is not None and matched_value != "":
                         inp.scroll_into_view_if_needed()
                         inp.click(click_count=3)
                         inp.type(str(matched_value), delay=40)
                         add_log(f"  Filled: '{label_text}' → '{str(matched_value)[:50]}'")
                     elif label_text.strip():
                         add_log(f"  Unmapped field: '{label_text}' -> pausing for your review")
-                        answer = _resolve_via_review_queue(add_log, user_id, job_id, label_text, form_data, resume_text)
+                        answer = _resolve_via_review_queue(page, add_log, user_id, job_id, label_text, form_data, resume_text)
                         if answer:
                             inp.scroll_into_view_if_needed()
                             inp.click(click_count=3)
@@ -464,7 +510,7 @@ def _fill_and_submit_form_impl(
                         if opt_texts:
                             prompt = f"{label_text} (Options: {', '.join(opt_texts)})"
                             add_log(f"  Unmapped select: '{label_text}' -> asking AI")
-                            answer = _resolve_via_review_queue(add_log, user_id, job_id, prompt, form_data, resume_text)
+                            answer = _resolve_via_review_queue(page, add_log, user_id, job_id, prompt, form_data, resume_text)
                             if answer:
                                 try_select_option(form_context, sel, [answer], add_log)
                             else:
@@ -488,13 +534,13 @@ def _fill_and_submit_form_impl(
                     if cb.is_checked():
                         continue
                     if any(kw in label_text for kw in consent_keywords):
-                        cb.check()
+                        cb.check(force=True)
                         add_log(f"  Checked consent box: '{label_text}'")
                     elif label_text:
                         add_log(f"  Unmapped checkbox: '{label_text}' -> pausing for your review")
-                        answer = _resolve_via_review_queue(add_log, user_id, job_id, f"Check this box? {label_text}", form_data, resume_text)
+                        answer = _resolve_via_review_queue(page, add_log, user_id, job_id, f"Check this box? {label_text}", form_data, resume_text)
                         if answer and answer.strip().lower() in ('yes', 'y', 'true', 'check', 'checked'):
-                            cb.check()
+                            cb.check(force=True)
                             add_log(f"  Resumed — checked '{label_text}' per your answer.")
                         else:
                             add_log(f"  Leaving '{label_text}' unchecked and continuing.", "warn")
@@ -522,7 +568,7 @@ def _fill_and_submit_form_impl(
 
                         if any(kw in parent_text or kw in question for kw in _question_keywords(question)):
                             if radio_label.lower() in (answer.lower(), answer.lower()[:2]):
-                                radio.check()
+                                radio.check(force=True)
                                 add_log(f"  Answered: '{qa_item.get('question', '')[:60]}' → {answer}")
                                 break
                 except Exception as e:
@@ -549,7 +595,7 @@ def _fill_and_submit_form_impl(
                         option_labels = [get_field_label(form_context, r).strip() for r in radios]
                         question_text = f"{group_label} (options: {', '.join(o for o in option_labels if o)})"
                         add_log(f"  Unanswered radio group: '{group_label}' -> pausing for your review")
-                        answer = _resolve_via_review_queue(add_log, user_id, job_id, question_text, form_data, resume_text)
+                        answer = _resolve_via_review_queue(page, add_log, user_id, job_id, question_text, form_data, resume_text)
                         if answer:
                             chosen = None
                             for r, opt_label in zip(radios, option_labels):
@@ -557,7 +603,7 @@ def _fill_and_submit_form_impl(
                                     chosen = r
                                     break
                             if chosen:
-                                chosen.check()
+                                chosen.check(force=True)
                                 add_log(f"  Resumed — selected '{group_label}' option per your answer.")
                             else:
                                 add_log(f"  Could not match your answer to an option for '{group_label}'; leaving unset.", "warn")
@@ -599,6 +645,46 @@ def _fill_and_submit_form_impl(
                 f.write(screenshot_bytes)
             screenshot_url = f"/uploads/screenshots/{ss_filename}"
             steps_done = 9
+
+            # ── Check for Captcha & Manual Pause ──────────────────────────
+            try:
+                captcha_detected = len(page.query_selector_all('iframe[src*="recaptcha"], iframe[title*="recaptcha"], .g-recaptcha, iframe[src*="hcaptcha"]')) > 0
+                if not captcha_detected and form_context != page:
+                    captcha_detected = len(form_context.query_selector_all('iframe[src*="recaptcha"], iframe[title*="recaptcha"], .g-recaptcha, iframe[src*="hcaptcha"]')) > 0
+                
+                if captcha_detected:
+                    add_log("Detected reCAPTCHA/Captcha. Please solve it manually. Click 'CONTINUE AUTOMATION' at the top when done.", "warn")
+                    page.evaluate("""
+                        let btn = document.createElement('button');
+                        btn.innerHTML = 'CONTINUE AUTOMATION';
+                        btn.id = 'automation-resume-btn';
+                        btn.style.position = 'fixed';
+                        btn.style.top = '10px';
+                        btn.style.left = '50%';
+                        btn.style.transform = 'translateX(-50%)';
+                        btn.style.zIndex = '9999999';
+                        btn.style.padding = '15px 30px';
+                        btn.style.fontSize = '20px';
+                        btn.style.fontWeight = 'bold';
+                        btn.style.background = '#e74c3c';
+                        btn.style.color = 'white';
+                        btn.style.border = '2px solid white';
+                        btn.style.borderRadius = '8px';
+                        btn.style.cursor = 'pointer';
+                        btn.style.boxShadow = '0 4px 6px rgba(0,0,0,0.3)';
+                        btn.onclick = function() { window.automationResumed = true; btn.remove(); };
+                        document.body.appendChild(btn);
+                        window.automationResumed = false;
+                    """)
+                    
+                    # Wait up to 3 minutes for user to click
+                    for _ in range(180):
+                        if page.evaluate("window.automationResumed"):
+                            break
+                        page.wait_for_timeout(1000)
+                    add_log("Resuming after manual Captcha check.")
+            except Exception as e:
+                add_log(f"Captcha detection error: {str(e)}", "warn")
 
             # ── Click Submit Button ───────────────────────────────────────
             add_log("Looking for submit button...")
@@ -678,49 +764,100 @@ def _fill_and_submit_form_impl(
             except Exception:
                 pass
 
+            # Clean up ephemeral session profile directory to avoid disk accumulation.
+            # Persistent user profiles (user_id only) are intentionally kept.
+            if session_id:
+                session_profile = get_shared_profile_dir(user_id=user_id, session_id=session_id)
+                if did_manual_login and user_id:
+                    # The user logged in manually during this ephemeral session!
+                    # Sync the new cookies/session back to the persistent user profile.
+                    try:
+                        user_profile = os.path.join(project_root, "browser_profiles", f"user_{user_id}")
+                        shutil.rmtree(user_profile, ignore_errors=True)
+                        shutil.copytree(session_profile, user_profile)
+                        logger.info(f"Saved manual login: copied session profile back to user profile")
+                    except Exception as e:
+                        logger.warning(f"Failed to save manual login back to user profile: {e}")
+                
+                try:
+                    shutil.rmtree(session_profile, ignore_errors=True)
+                    logger.info(f"Cleaned up ephemeral session profile: {session_profile}")
+                except Exception as e:
+                    logger.warning(f"Failed to clean up session profile {session_profile}: {e}")
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # HELPERS
 # ──────────────────────────────────────────────────────────────────────────────
 
-def get_shared_profile_dir(user_id: int = None) -> str:
+def get_shared_profile_dir(user_id: int = None, session_id: int = None) -> str:
     """
-    Absolute path to a persistent browser profile. Now varies by user_id for
-    parallel applications - each user gets their own profile directory.
-    Log into each job platform once inside this profile and the session (cookies
-    + localStorage) is reused on all future runs — no re-login.
+    Absolute path to a persistent browser profile.
 
-    Defaults to the user's real daily Chrome profile so extensions/bookmarks/
-    logins already there are available. Override with the AUTOJOBAPPLY_PROFILE_DIR
-    environment variable if needed.
+    Priority:
+      1. AUTOJOBAPPLY_PROFILE_DIR env-override (shared/debug use)
+      2. session_id  → ephemeral per-job profile  (browser_profiles/session_<id>/)
+                       Gives full isolation so N jobs for the same user run in
+                       parallel without fighting over the same profile lock.
+      3. user_id     → persistent per-user profile (browser_profiles/user_<id>/)
+                       Reuses login cookies across jobs — user logs in once.
+      4. fallback    → legacy shared profile (browser_profile/)
+
+    When a session profile is used, the caller is responsible for deleting it
+    after the session ends (done in the `finally` block of _fill_and_submit_form_impl).
     """
     override = os.environ.get("AUTOJOBAPPLY_PROFILE_DIR")
     if override:
         os.makedirs(override, exist_ok=True)
         return override
-    
+
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    
-    # Use per-user profile directories for parallel applications
+
+    if session_id:
+        # Ephemeral per-session profile — seed it from the user profile if available
+        # so existing login sessions carry over for this one run.
+        session_path = os.path.join(project_root, "browser_profiles", f"session_{session_id}")
+        if not os.path.exists(session_path):
+            if user_id:
+                user_path = os.path.join(project_root, "browser_profiles", f"user_{user_id}")
+                if os.path.exists(user_path):
+                    try:
+                        shutil.copytree(user_path, session_path)
+                        logger.info(f"Seeded session profile from user profile: {user_path} → {session_path}")
+                    except Exception as e:
+                        logger.warning(f"Could not seed session profile from user profile: {e}")
+                        os.makedirs(session_path, exist_ok=True)
+                else:
+                    os.makedirs(session_path, exist_ok=True)
+            else:
+                os.makedirs(session_path, exist_ok=True)
+        return session_path
+
     if user_id:
         path = os.path.join(project_root, "browser_profiles", f"user_{user_id}")
     else:
         path = os.path.join(project_root, "browser_profile")
-    
+
     os.makedirs(path, exist_ok=True)
     return path
 
 
-def launch_logged_in_context(p, headless: bool = False, slow_mo: int = 0, user_id: int = None):
+def launch_logged_in_context(p, headless: bool = False, slow_mo: int = 0, user_id: int = None, session_id: int = None):
     """
-    Launch a persistent context on the shared profile. Prefers the installed
-    Google Chrome ("chrome" channel) so pages see a real browser; falls back to
-    bundled Chromium if Chrome isn't available.
+    Launch a persistent browser context.
+    - When session_id is given, uses an ephemeral session-scoped profile
+      (seeded from the user profile if available) for full parallel isolation.
+    - Otherwise falls back to the persistent per-user profile.
+    Prefers installed Google Chrome; falls back to bundled Chromium.
     """
-    user_data_dir = get_shared_profile_dir(user_id)
+    user_data_dir = get_shared_profile_dir(user_id=user_id, session_id=session_id)
     profile_directory = os.environ.get("AUTOJOBAPPLY_PROFILE_DIRECTORY")  # e.g. "Profile 1"
-    extra_args = ['--disable-blink-features=AutomationControlled']
-    if profile_directory:
+    extra_args = [
+        '--disable-blink-features=AutomationControlled',
+        '--disable-dev-shm-usage',
+        '--no-sandbox',
+    ]
+    if profile_directory and not session_id:  # don't override directory for ephemeral sessions
         extra_args.append(f'--profile-directory={profile_directory}')
     common = dict(
         user_data_dir=user_data_dir,
@@ -762,6 +899,8 @@ def build_field_map(form_data: dict, cover_letter: str) -> dict:
         ('expected salary', 'expected ctc', 'desired salary'): clean_val(form_data.get('expected_salary')),
         ('notice period', 'notice'):                    clean_val(form_data.get('notice_period'), "0"),
         ('cover letter', 'cover note', 'why do you want'):  cover_letter[:3000] if cover_letter else '',
+        ('company', 'current company', 'employer', 'organization'): clean_val(form_data.get('current_company'), "__SKIP__"),
+        ('job title', 'current title', 'current role', 'headline'): clean_val(form_data.get('headline'), "__SKIP__"),
     }
 
 
@@ -888,6 +1027,7 @@ KNOWN_LISTING_URL_PATTERNS = [
     'indeed.com/viewjob',
     'indeed.com/rc/clk',
     'indeed.com/pagead',
+    'naukri.com/job-listings',
 ]
 
 
@@ -918,12 +1058,20 @@ def _looks_like_form_page(page) -> bool:
 def _find_apply_button(page):
     """
     Looks for an Apply/Easy Apply button, tolerating late-hydrating SPA pages
-    (LinkedIn/Indeed render the button asynchronously after initial load).
+    (LinkedIn/Indeed/Naukri render the button asynchronously after initial load).
     Selectors are tried instantly first (no wait); only if none are present
     yet do we wait once (combined, not per-selector — waiting per selector
     would multiply into tens of seconds of dead time).
     """
     apply_selectors = [
+        'button:has-text("Apply on company site")',
+        'a:has-text("Apply on company site")',
+        'button:has-text("Apply On Company Site")',
+        'a:has-text("Apply On Company Site")',
+        'button:has-text("Company Site")',
+        'a:has-text("Company Site")',
+        'button.apply-message',
+        'button#apply-button',
         'button[aria-label*="Easy Apply" i]',
         'button:has-text("Easy Apply")',
         'a:has-text("Easy Apply")',
@@ -966,7 +1114,7 @@ def _find_apply_button(page):
 def _is_multi_step_wizard(page) -> bool:
     """
     Detect if the current page is a multi-step modal wizard (LinkedIn Easy Apply,
-    Indeed Apply modal). Returns True if we detect navigation buttons like
+    Indeed Apply modal, Naukri Apply modal). Returns True if we detect navigation buttons like
     "Next", "Continue", "Review" that indicate a multi-step flow.
     """
     try:
@@ -1030,7 +1178,7 @@ def _is_submit_or_review_page(page) -> bool:
 
 def _fill_multi_step_wizard(page, form_data: dict, custom_qa: list, cover_letter: str, resume_path: str, add_log, user_id: int = None, job_id: int = None, resume_text: str = "") -> bool:
     """
-    Handle multi-step modal wizards (LinkedIn Easy Apply, Indeed Apply modal).
+    Handle multi-step modal wizards (LinkedIn Easy Apply, Indeed Apply modal, Naukri).
     Loops through steps until we reach the submit/review page.
     
     Returns:
@@ -1068,13 +1216,16 @@ def _fill_multi_step_wizard(page, form_data: dict, custom_qa: list, cover_letter
                 
                 matched_value = match_field_value(label_text, inp.get_attribute('name') or '', inp.get_attribute('placeholder') or '', field_map)
                 
-                if matched_value is not None and matched_value != "":
+                if matched_value == "__SKIP__":
+                    add_log(f"  Step {current_step}: Explicitly skipping '{label_text}'")
+                    continue
+                elif matched_value is not None and matched_value != "":
                     inp.scroll_into_view_if_needed()
                     inp.click(click_count=3)
                     inp.type(str(matched_value), delay=40)
                     add_log(f"  Step {current_step}: Filled '{label_text}'")
                 elif label_text.strip():
-                    answer = _resolve_via_review_queue(add_log, user_id, job_id, label_text, form_data, resume_text)
+                    answer = _resolve_via_review_queue(page, add_log, user_id, job_id, label_text, form_data, resume_text)
                     if answer:
                         inp.scroll_into_view_if_needed()
                         inp.click(click_count=3)
@@ -1110,7 +1261,7 @@ def _fill_multi_step_wizard(page, form_data: dict, custom_qa: list, cover_letter
                     if opt_texts:
                         prompt = f"{label_text} (Options: {', '.join(opt_texts)})"
                         add_log(f"  Step {current_step}: Unmapped select: '{label_text}' -> asking AI")
-                        answer = _resolve_via_review_queue(add_log, user_id, job_id, prompt, form_data, resume_text)
+                        answer = _resolve_via_review_queue(page, add_log, user_id, job_id, prompt, form_data, resume_text)
                         if answer:
                             try_select_option(page, sel, [answer], add_log)
                         else:
@@ -1132,13 +1283,13 @@ def _fill_multi_step_wizard(page, form_data: dict, custom_qa: list, cover_letter
                 if cb.is_checked():
                     continue
                 if any(kw in label_text for kw in consent_keywords):
-                    cb.check()
+                    cb.check(force=True)
                     add_log(f"  Step {current_step}: Checked consent box")
                 elif label_text:
                     add_log(f"  Step {current_step}: Unmapped checkbox: '{label_text}' -> asking AI")
-                    answer = _resolve_via_review_queue(add_log, user_id, job_id, f"Check this box? {label_text}", form_data, resume_text)
+                    answer = _resolve_via_review_queue(page, add_log, user_id, job_id, f"Check this box? {label_text}", form_data, resume_text)
                     if answer and answer.strip().lower() in ('yes', 'y', 'true', 'check', 'checked'):
-                        cb.check()
+                        cb.check(force=True)
                         add_log(f"  Step {current_step}: Checked '{label_text}' per AI answer")
             except Exception as e:
                 add_log(f"  Step {current_step}: Skipped checkbox: {str(e)}", "warn")
@@ -1164,7 +1315,7 @@ def _fill_multi_step_wizard(page, form_data: dict, custom_qa: list, cover_letter
                     option_labels = [get_field_label(page, r).strip() for r in radios]
                     question_text = f"{group_label} (options: {', '.join(o for o in option_labels if o)})"
                     add_log(f"  Step {current_step}: Unanswered radio group: '{group_label}' -> asking AI")
-                    answer = _resolve_via_review_queue(add_log, user_id, job_id, question_text, form_data, resume_text)
+                    answer = _resolve_via_review_queue(page, add_log, user_id, job_id, question_text, form_data, resume_text)
                     if answer:
                         chosen = None
                         for r, opt_label in zip(radios, option_labels):
@@ -1172,7 +1323,7 @@ def _fill_multi_step_wizard(page, form_data: dict, custom_qa: list, cover_letter
                                 chosen = r
                                 break
                         if chosen:
-                            chosen.check()
+                            chosen.check(force=True)
                             add_log(f"  Step {current_step}: Selected '{group_label}' option per AI answer")
                         else:
                             add_log(f"  Step {current_step}: Could not match AI answer '{answer}' to options; leaving unset", "warn")
@@ -1222,12 +1373,12 @@ def _click_apply_and_switch(ctx, page, add_log, is_multi_step: bool = False):
     """
     Clicks an Apply/Easy Apply button to get from a job listing page to the
     real application form. The form may render in place (LinkedIn Easy Apply,
-    Indeed Apply modal) or open in a new tab (external ATS, e.g. "Responses
+    Indeed Apply modal, Naukri) or open in a new tab (external ATS, e.g. "Responses
     managed off LinkedIn"). Returns the page to keep using — possibly a new one.
     A no-op (returns page unchanged) if the current page already looks like a
     form, so direct ATS links (Greenhouse/Lever) are unaffected.
     
-    If is_multi_step is True, this is for LinkedIn/Indeed modal wizards.
+    If is_multi_step is True, this is for LinkedIn/Indeed/Naukri modal wizards.
     """
     if _looks_like_form_page(page):
         return page
@@ -1253,20 +1404,41 @@ def _click_apply_and_switch(ctx, page, add_log, is_multi_step: bool = False):
         return page
 
     page.wait_for_timeout(3000)
-
+    
+    target_page = page
     if len(ctx.pages) > pages_before:
-        new_page = ctx.pages[-1]
+        target_page = ctx.pages[-1]
         add_log(f"  Clicked '{btn_text}' — a new tab opened for the application, switching to it.")
         try:
-            new_page.wait_for_load_state("domcontentloaded", timeout=30000)
-            new_page.wait_for_timeout(2000)
+            target_page.wait_for_load_state("domcontentloaded", timeout=30000)
+            target_page.wait_for_timeout(2000)
         except Exception:
             pass
-        return new_page
+
+    # Check if Naukri 1-click apply succeeded instantly
+    if "naukri.com" in target_page.url.lower():
+        if "myapply/saveapply" in target_page.url.lower():
+            add_log("Naukri 1-click apply was successful (via success URL)!")
+            raise OneClickApplySuccess()
+            
+        try:
+            success_toast = target_page.query_selector('text="Applied successfully" i, text="Successfully applied" i, text="successfully applied to" i, .apply-message:has-text("Applied")')
+            applied_btn = target_page.query_selector('button:has-text("Applied"), a:has-text("Applied"), div[class*="apply"]:has-text("Applied"), span[class*="apply"]:has-text("Applied"), div[id*="apply"]:has-text("Applied")')
+            
+            if success_toast or applied_btn:
+                add_log("Naukri 1-click apply was successful!")
+                raise OneClickApplySuccess()
+        except OneClickApplySuccess:
+            raise
+        except Exception as e:
+            add_log(f"Naukri 1-click apply check error: {str(e)}", "warn")
+
+    if target_page != page:
+        return target_page
 
     add_log(f"  Clicked '{btn_text}' — application form should now be visible on this page.")
-    page.wait_for_timeout(1000)
-    return page
+    target_page.wait_for_timeout(1000)
+    return target_page
 
 
 def get_form_context(page):
@@ -1440,13 +1612,14 @@ Instructions:
 14. For text fields:
     - Return plain text only.
     - Do not use Markdown, bullet points, or special formatting.
-15. If the answer cannot be determined from the resume (excluding expected/current salary and notice period, which MUST follow the defaults in rules 8 and 9):
+15. If the question is about demographics (Gender, Race, Disability, Veteran status, Sexual Orientation, Religion) and the resume doesn't specify, ALWAYS return the "Prefer not to say" or "Decline to identify" option if provided in the options list.
+16. If the answer cannot be determined from the resume (excluding expected/current salary, notice period, and demographics):
     - First check whether it can be reasonably inferred (e.g. assume authorized to work = "Yes", assume visa sponsorship not required = "No", 18 or older = "Yes").
     - If not, return exactly: "Not specified in resume"
-16. Never mention that you are an AI.
-17. Never mention the resume in your response.
-18. Keep answers natural so they appear to be written by the candidate.
-19. If the question asks for a count, duration, or numeric value in specific units (for example: "How many years of experience...", "What is your notice period in days?", "Expected salary in LPA", etc.), return ONLY the number/digits. Do not append words like "years", "months", "days", "LPA", etc.
+17. Never mention that you are an AI.
+18. Never mention the resume in your response.
+19. Keep answers natural so they appear to be written by the candidate.
+20. If the question asks for a count, duration, or numeric value in specific units (for example: "How many years of experience...", "What is your notice period in days?", "Expected salary in LPA", etc.), return ONLY the number/digits. Do not append words like "years", "months", "days", "LPA", etc.
 
 CANDIDATE PROFILE:
 {context}
@@ -1542,7 +1715,53 @@ def _score_ai_answer(answer: str) -> tuple:
         return answer, 0.85
 
 
-def _resolve_via_review_queue(add_log, user_id, job_id, question_text: str, form_data: dict = None, resume_text: str = ""):
+def pause_for_user_input(page, prompt_text="Please answer the question on screen"):
+    try:
+        page.evaluate(f"""() => {{
+            const btn = document.createElement('button');
+            btn.id = 'autojobapply-resume-btn';
+            btn.innerHTML = 'Resume Automation ➔';
+            btn.style.position = 'fixed';
+            btn.style.bottom = '20px';
+            btn.style.right = '20px';
+            btn.style.zIndex = '999999';
+            btn.style.padding = '15px 25px';
+            btn.style.fontSize = '18px';
+            btn.style.fontWeight = 'bold';
+            btn.style.backgroundColor = '#0066cc';
+            btn.style.color = 'white';
+            btn.style.border = 'none';
+            btn.style.borderRadius = '8px';
+            btn.style.cursor = 'pointer';
+            btn.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+            
+            const label = document.createElement('div');
+            label.id = 'autojobapply-prompt-label';
+            label.innerText = `{prompt_text}`;
+            label.style.position = 'fixed';
+            label.style.bottom = '80px';
+            label.style.right = '20px';
+            label.style.zIndex = '999999';
+            label.style.backgroundColor = '#fff3cd';
+            label.style.color = '#856404';
+            label.style.padding = '10px 15px';
+            label.style.border = '2px solid #ffeeba';
+            label.style.borderRadius = '8px';
+            label.style.fontWeight = 'bold';
+            label.style.maxWidth = '300px';
+            
+            btn.onclick = () => {{
+                btn.remove();
+                label.remove();
+            }};
+            document.body.appendChild(label);
+            document.body.appendChild(btn);
+        }}""")
+        page.wait_for_function("!document.getElementById('autojobapply-resume-btn')", timeout=0)
+    except Exception as e:
+        pass
+
+def _resolve_via_review_queue(page, add_log, user_id, job_id, question_text: str, form_data: dict = None, resume_text: str = ""):
     """
     AI-FIRST AUTO-ANSWER MODE — Human review queue completely bypassed.
 
@@ -1561,10 +1780,12 @@ def _resolve_via_review_queue(add_log, user_id, job_id, question_text: str, form
             add_log(f"  🤖 AI answered (low confidence {confidence:.0%}): '{ai_answer[:80]}'")
             return ai_answer
         else:
-            add_log(f"  🤖 AI could not answer '{question_text[:60]}' — leaving blank and continuing.", "warn")
+            add_log(f"  🤖 AI could not answer '{question_text[:60]}'. Pausing for your manual input...", "warn")
+            pause_for_user_input(page, f"AI couldn't answer:\n\n{question_text[:100]}\n\nPlease answer manually and click Resume.")
             return None
     else:
-        add_log(f"  No profile data to answer '{question_text[:60]}' — leaving blank.", "warn")
+        add_log(f"  No profile data to answer '{question_text[:60]}'. Pausing for your manual input...", "warn")
+        pause_for_user_input(page, f"No profile data to answer:\n\n{question_text[:100]}\n\nPlease answer manually and click Resume.")
         return None
 
 

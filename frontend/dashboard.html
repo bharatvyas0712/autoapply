@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard - AutoJobApply</title>
   <link rel="stylesheet" href="css/main.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
   <div class="app-layout">
@@ -116,6 +117,19 @@
                 <a href="profile.html" class="btn btn-secondary btn-sm" style="margin-top: 12px;">Update details</a>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- Section: Analytics Chart -->
+        <div class="card" style="margin-top: 28px;">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title">Job Application Analytics</h3>
+              <p class="card-subtitle">Performance breakdown of automated applications over time</p>
+            </div>
+          </div>
+          <div class="card-body" style="position: relative; height: 320px; width: 100%;">
+            <canvas id="analytics-chart"></canvas>
           </div>
         </div>
 

@@ -21,7 +21,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from logger_config import logger
 from form_filler import scrape_job_page, analyze_form_fields, fill_and_submit_form
-from job_searcher import search_linkedin_jobs, search_indeed_jobs, search_ats_jobs
+from job_searcher import search_linkedin_jobs, search_indeed_jobs, search_ats_jobs, search_naukri_jobs
 
 app = Flask(__name__)
 CORS(app)
@@ -69,9 +69,12 @@ def search():
     """
     Search jobs on a public board.
     Body: { "query": "Software Engineer", "location": "Remote", "source": "indeed",
+            "experience_level": "fresher", "job_type": "full-time",
             "easy_apply_only": true, "exclude_urls": ["https://...", ...] }
     source can be "indeed" (default), "linkedin", "ats" (Greenhouse + Lever), or
     "all" (searches every source above and merges/dedupes the results).
+    experience_level: "", "fresher", "entry", "mid", "senior"
+    job_type: "", "full-time", "part-time", "contract", "internship"
     easy_apply_only (Indeed only): when true, only returns jobs that use Indeed's
     own native "Easily apply" flow, skipping ones that redirect to the company's
     own site — so every result returned can actually be auto-applied end-to-end.
@@ -82,22 +85,40 @@ def search():
     data = request.json or {}
     query = data.get('query', 'Software Engineer')
     location = data.get('location', 'Remote')
-    source = (data.get('source') or 'indeed').lower()
+    source = (data.get('source') or 'all').lower()
+    experience_level = (data.get('experience_level') or '').lower()
+    job_type = (data.get('job_type') or '').lower()
     easy_apply_only = bool(data.get('easy_apply_only', False))
     exclude_urls = set(data.get('exclude_urls') or [])
 
+    actual_query = query
+    q_lower = actual_query.lower()
+    if experience_level == 'fresher' and 'fresher' not in q_lower and 'intern' not in q_lower:
+        actual_query += " fresher"
+    elif experience_level == 'entry' and not any(k in q_lower for k in ('entry', 'junior', 'associate')):
+        actual_query += " entry level"
+    elif experience_level == 'senior' and not any(k in q_lower for k in ('senior', 'lead', 'manager', 'principal')):
+        actual_query += " senior"
     try:
         excluded_count = 0
         if source == 'all':
             jobs = []
             seen_urls = set()
-            for fn in (search_ats_jobs, search_indeed_jobs, search_linkedin_jobs):
+            for fn in (search_ats_jobs, search_indeed_jobs, search_linkedin_jobs, search_naukri_jobs):
                 try:
                     if fn is search_indeed_jobs:
-                        found, indeed_excluded = fn(query, location, easy_apply_only=easy_apply_only, exclude_urls=exclude_urls)
+                        found, indeed_excluded = fn(actual_query, location, easy_apply_only=easy_apply_only,
+                                                     exclude_urls=exclude_urls, experience_level=experience_level,
+                                                     job_type=job_type)
                         excluded_count += indeed_excluded
+                    elif fn is search_naukri_jobs:
+                        found, naukri_excluded = fn(actual_query, location, exclude_urls=exclude_urls, 
+                                                     experience_level=experience_level, job_type=job_type)
+                        excluded_count += naukri_excluded
+                    elif fn is search_linkedin_jobs:
+                        found = fn(actual_query, location, experience_level=experience_level, job_type=job_type)
                     else:
-                        found = fn(query, location)
+                        found = fn(actual_query, location, experience_level=experience_level, job_type=job_type)
                     for job in found:
                         url = job.get('job_url')
                         if not url or url in seen_urls:
@@ -110,15 +131,21 @@ def search():
                 except Exception as e:
                     print(f"'all' source: {fn.__name__} failed: {e}")
         elif source == 'linkedin':
-            raw = search_linkedin_jobs(query, location)
+            raw = search_linkedin_jobs(actual_query, location, experience_level=experience_level, job_type=job_type)
             jobs = [j for j in raw if j.get('job_url') not in exclude_urls]
             excluded_count = len(raw) - len(jobs)
         elif source in ('ats', 'greenhouse', 'lever'):
-            raw = search_ats_jobs(query, location)
+            raw = search_ats_jobs(actual_query, location, experience_level=experience_level, job_type=job_type)
             jobs = [j for j in raw if j.get('job_url') not in exclude_urls]
             excluded_count = len(raw) - len(jobs)
+        elif source == 'naukri':
+            jobs, excluded_count = search_naukri_jobs(actual_query, location, 
+                                                       exclude_urls=exclude_urls, experience_level=experience_level,
+                                                       job_type=job_type)
         else:
-            jobs, excluded_count = search_indeed_jobs(query, location, easy_apply_only=easy_apply_only, exclude_urls=exclude_urls)
+            jobs, excluded_count = search_indeed_jobs(actual_query, location, easy_apply_only=easy_apply_only,
+                                                       exclude_urls=exclude_urls, experience_level=experience_level,
+                                                       job_type=job_type)
         return jsonify({"success": True, "jobs": jobs, "source": source, "excluded_already_tracked": excluded_count})
     except Exception as e:
         import traceback
@@ -201,12 +228,13 @@ def apply_job():
     resume_text  = data.get('resume_text', '') or ''
     user_id      = data.get('user_id', None)
     job_id       = data.get('job_id', None)
+    session_id   = data.get('session_id', None)
 
     if not job_url:
         return jsonify({"success": False, "message": "job_url is required"}), 400
 
     try:
-        logger.info(f"Starting job application for user {user_id}, job {job_id}")
+        logger.info(f"Starting job application for user {user_id}, job {job_id}, session {session_id}")
         result = fill_and_submit_form(
             url=job_url,
             form_data=form_data,
@@ -216,6 +244,7 @@ def apply_job():
             user_id=user_id,
             job_id=job_id,
             resume_text=resume_text
+            # session_id=session_id omitted to enforce direct use of persistent profile
         )
         return jsonify(result)
     except Exception as e:

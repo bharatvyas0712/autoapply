@@ -169,11 +169,24 @@ async function handleSaveJob(e) {
   }
 }
 
-// ── Discover Jobs & Auto-Apply ──────────────────────────────────────────
+// ── Source change handler ───────────────────────────────────────────
+function onSourceChange() {
+  // Easy Apply is only useful for Indeed — show/hide accordingly
+  const source = document.getElementById('discover-source').value;
+  const wrap = document.getElementById('easy-apply-wrap');
+  if (wrap) {
+    wrap.style.opacity = (source === 'indeed' || source === 'all') ? '1' : '0.4';
+  }
+}
 
 async function discoverJobs() {
   const query = document.getElementById('discover-query').value.trim();
   const location = document.getElementById('discover-location').value.trim();
+  const experience_level = document.getElementById('discover-experience').value;
+  const source = document.getElementById('discover-source').value || 'all';
+  const job_type = document.getElementById('discover-jobtype').value;
+  const easy_apply_only = document.getElementById('discover-easy-apply')?.checked || false;
+
   if (!query) {
     showToast('Please enter a job title to search.', 'error');
     return;
@@ -184,48 +197,89 @@ async function discoverJobs() {
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Searching...';
   resContainer.style.display = 'block';
-  resContainer.innerHTML = '<div style="text-align:center; padding: 20px; color: var(--text-muted);">Scraping LinkedIn Jobs... this may take 10-15 seconds.</div>';
+
+  const sourceLabels = { all: 'All Sources', linkedin: 'LinkedIn', indeed: 'Indeed', naukri: 'Naukri', ats: 'ATS (Greenhouse + Lever)' };
+  const expLabels = { '': 'Any Level', fresher: 'Fresher/Intern', entry: 'Entry Level', mid: 'Mid Level', senior: 'Senior Level' };
+  resContainer.innerHTML = `<div style="text-align:center; padding: 20px; color: var(--text-muted);">
+    <span class="spinner" style="margin: 0 auto 12px;"></span><br>
+    Searching <strong>${sourceLabels[source] || source}</strong> for <strong>${query}</strong>
+    ${experience_level ? ` • ${expLabels[experience_level]}` : ''}
+    ${job_type ? ` • ${job_type}` : ''}...<br>
+    <span style="font-size: 11px;">This may take 10-30 seconds depending on sources.</span>
+  </div>`;
 
   try {
-    const res = await api.post('/jobs/search', { query, location });
+    const res = await api.post('/jobs/search', {
+      query,
+      location,
+      source,
+      experience_level,
+      job_type,
+      easy_apply_only
+    });
     if (res.success && res.jobs && res.jobs.length > 0) {
-      renderDiscoverResults(res.jobs);
+      renderDiscoverResults(res.jobs, source, experience_level);
     } else {
-      resContainer.innerHTML = `<div style="text-align:center; color: var(--status-warning-text); padding: 10px;">No jobs found or search failed. Try again.</div>`;
+      resContainer.innerHTML = `<div style="text-align:center; color: var(--status-warning-text); padding: 16px;">
+        <span style="font-size: 28px;">🔍</span>
+        <p style="margin-top: 8px;">No jobs found matching your filters. Try broadening your search or changing the source.</p>
+      </div>`;
     }
   } catch (err) {
     resContainer.innerHTML = `<div style="text-align:center; color: var(--status-error-text); padding: 10px;">Search request failed.</div>`;
   } finally {
     btn.disabled = false;
-    btn.innerText = 'Search Jobs';
+    btn.innerHTML = '🚀 Search Jobs';
   }
 }
 
-function renderDiscoverResults(jobs) {
+function renderDiscoverResults(jobs, source, experienceLevel) {
   const container = document.getElementById('discover-results');
-  container.innerHTML = `<div style="font-size: 13px; font-weight: 600; margin-bottom: 10px;">Found ${jobs.length} jobs:</div>`;
+  const sourceLabels = { all: 'All Sources', linkedin: 'LinkedIn', indeed: 'Indeed', naukri: 'Naukri', ats: 'ATS' };
+  const expLabels = { '': '', fresher: 'Fresher/Intern', entry: 'Entry Level', mid: 'Mid Level', senior: 'Senior' };
+
+  container.innerHTML = `<div style="font-size: 13px; font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+    <span>Found <strong>${jobs.length}</strong> jobs from <strong>${sourceLabels[source] || source}</strong>${experienceLevel ? ` • ${expLabels[experienceLevel]}` : ''}:</span>
+  </div>`;
   
   const grid = document.createElement('div');
   grid.style.display = 'flex';
   grid.style.flexDirection = 'column';
   grid.style.gap = '10px';
 
+  const sourceBadgeColors = {
+    linkedin_public: { bg: 'rgba(0,119,181,0.12)', color: '#0077B5', label: 'LinkedIn' },
+    indeed: { bg: 'rgba(0,91,187,0.12)', color: '#2164f3', label: 'Indeed' },
+    naukri: { bg: 'rgba(39,100,238,0.12)', color: '#2764ee', label: 'Naukri' },
+    greenhouse: { bg: 'rgba(16,185,129,0.12)', color: '#10b981', label: 'Greenhouse' },
+    lever: { bg: 'rgba(255,153,0,0.12)', color: '#ff9900', label: 'Lever' },
+  };
+
   jobs.forEach((job, idx) => {
     const el = document.createElement('div');
     el.style.background = 'var(--bg-input)';
-    el.style.padding = '12px';
-    el.style.borderRadius = '8px';
+    el.style.padding = '14px 16px';
+    el.style.borderRadius = '10px';
     el.style.border = '1px solid var(--border-color)';
     el.style.display = 'flex';
     el.style.justifyContent = 'space-between';
     el.style.alignItems = 'center';
+    el.style.gap = '12px';
+    el.style.transition = 'border-color 0.2s, transform 0.2s';
+
+    const srcInfo = sourceBadgeColors[job.source] || { bg: 'rgba(107,114,128,0.12)', color: 'var(--text-muted)', label: job.source };
+    const easyApplyTag = job.easy_apply ? `<span style="font-size:10px; padding:2px 8px; border-radius:12px; background:rgba(16,185,129,0.15); color:#10b981; font-weight:600;">⚡ Easy Apply</span>` : '';
     
     el.innerHTML = `
-      <div>
-        <div style="font-weight: 700; font-size: 14px;">${job.title}</div>
-        <div style="font-size: 12px; color: var(--text-secondary);">${job.company} • ${job.location}</div>
+      <div style="flex: 1; min-width: 0;">
+        <div style="font-weight: 700; font-size: 14px; line-height: 1.3;">${job.title}</div>
+        <div style="font-size: 12px; color: var(--text-secondary); margin-top: 3px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <span>${job.company}</span> • <span>${job.location}</span>
+          <span style="font-size:10px; padding:2px 8px; border-radius:12px; background:${srcInfo.bg}; color:${srcInfo.color}; font-weight:600;">${srcInfo.label}</span>
+          ${easyApplyTag}
+        </div>
       </div>
-      <div style="display: flex; gap: 8px;">
+      <div style="display: flex; gap: 8px; flex-shrink: 0;">
         <a href="${job.job_url}" target="_blank" class="btn btn-ghost btn-sm" title="View Job">🔗</a>
         <button class="btn btn-primary btn-sm" onclick='oneClickAutoApply(${JSON.stringify(job).replace(/'/g, "&apos;")})' id="auto-btn-${idx}">
           ⚡ Auto-Apply

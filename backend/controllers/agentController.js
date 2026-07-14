@@ -7,7 +7,7 @@ require('dotenv').config();
  * POST /api/agent/run
  * The AI agent:
  *   1. Reads the user's resume-derived profile (skills, experience, headline)
- *   2. Searches Indeed for matching jobs
+ *   2. Searches Indeed/Naukri/etc for matching jobs
  *   3. Scores every job against the resume (fit_score + matched/missing skills)
  *   4. Saves the shortlist and returns it, ranked best-first, for the user to approve
  *
@@ -36,6 +36,8 @@ exports.runAgent = async (req, res) => {
     const minScore  = Number.isFinite(+req.body.min_score) ? +req.body.min_score : 40;
     const limit     = Math.min(parseInt(req.body.limit || 15, 10), 25);
     const easyApplyOnly = !!req.body.easy_apply_only;
+    const experience_level = req.body.experience_level || "";
+    const job_type = req.body.job_type || "";
 
     // Already-tracked job URLs for this user — passed as exclude_urls so the
     // automation service doesn't keep resurfacing the same jobs every run.
@@ -51,8 +53,16 @@ exports.runAgent = async (req, res) => {
     try {
       const resp = await axios.post(
         `${process.env.AUTOMATION_SERVICE_URL}/search_jobs`,
-        { query, location, source, easy_apply_only: easyApplyOnly, exclude_urls: excludeUrls },
-        // LinkedIn/Indeed now visit each job's own page for its full
+        {
+          query,
+          location,
+          source,
+          easy_apply_only: easyApplyOnly,
+          exclude_urls: excludeUrls,
+          experience_level,
+          job_type
+        },
+        // LinkedIn/Indeed/Naukri now visit each job's own page for its full
         // description (needed for accurate scoring), which is much slower
         // than scraping search cards alone — especially for source "all".
         { timeout: 240000 }

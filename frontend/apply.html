@@ -157,6 +157,44 @@
               </div>
             </div>
 
+            <!-- AI Resume Customizer & Skill Gaps Card -->
+            <div class="card" style="margin-bottom:20px; border-color: rgba(20,110,180,0.3); background: linear-gradient(135deg, rgba(20,110,180,0.06), rgba(16,185,129,0.04));">
+              <div class="review-section-title" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <span>✨ AI Resume Tailoring &amp; Skill Gaps</span>
+                <span class="badge badge-blue">Interactive</span>
+              </div>
+              <p style="font-size:12px; color:var(--text-muted); margin-bottom:14px; line-height:1.4;">Compare your resume/profile with this job's requirements to identify skill gaps, obtain concrete resume suggestions, and generate a tailored cover letter.</p>
+              
+              <button class="btn btn-secondary btn-sm" id="tailor-analyze-btn" onclick="analyzeAndTailor()" style="width:100%; display:flex; justify-content:center; align-items:center; gap:8px;">
+                🔍 Analyze Skill Gaps &amp; Tailor
+              </button>
+              
+              <div id="tailor-results-container" style="display:none; margin-top:16px; text-align:left; border-top:1px dashed var(--border-color); padding-top:16px;">
+                <!-- Skill Gaps Section -->
+                <div>
+                  <h4 style="font-size:13px; font-weight:700; color:var(--text-primary); display:flex; align-items:center; gap:6px; margin-bottom:8px;">
+                    🎯 Identified Skill Gaps
+                  </h4>
+                  <div id="tailor-gaps-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+                </div>
+                
+                <!-- Resume Optimization Section -->
+                <div style="margin-top:20px;">
+                  <h4 style="font-size:13px; font-weight:700; color:var(--text-primary); display:flex; align-items:center; gap:6px; margin-bottom:8px;">
+                    📝 Resume Enhancement Suggestions
+                  </h4>
+                  <div id="tailor-suggestions-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+                </div>
+
+                <!-- Action Button -->
+                <div style="margin-top:20px;">
+                  <button class="btn btn-primary btn-sm" id="apply-tailored-cl-btn" onclick="applyTailoredCoverLetter()" style="width:100%; background:linear-gradient(135deg, #10b981, #059669); color:#fff; font-weight:700; border:none; display:flex; justify-content:center; align-items:center; gap:8px;">
+                    ✍️ Apply Tailored Cover Letter
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <!-- Cover Letter -->
             <div class="card" style="margin-bottom:20px;">
               <div class="review-section-title">Cover Letter (Auto-Generated — Edit if Needed)</div>
@@ -178,6 +216,10 @@
           <p id="status-message" style="color:var(--text-secondary); margin-top:8px;">Playwright is opening the browser and filling in form fields. Please wait.</p>
           <div class="progress-bar-wrap" style="max-width:400px; margin:20px auto 0;">
             <div class="progress-bar-fill" id="submission-progress" style="width:20%;"></div>
+          </div>
+          <!-- Real-time Live Logs Terminal -->
+          <div id="live-logs-container" style="margin: 24px auto 0; max-width: 500px; text-align: left; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; max-height: 200px; overflow-y: auto; font-family: monospace; font-size: 11px; line-height: 1.4; color: var(--text-secondary); box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);">
+            <div style="color: var(--text-muted); font-style: italic;">Initializing live log streaming...</div>
           </div>
         </div>
 

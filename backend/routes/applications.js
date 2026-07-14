@@ -4,7 +4,7 @@ const auth = require('../middleware/auth');
 const {
   getApplications, getApplication, prepareApplication,
   updateApplication, submitApplication, getStatus, deleteApplication,
-  autoSubmitApplication, generateAIAnswers
+  autoSubmitApplication, generateAIAnswers, tailorApplication, updateSessionLog
 } = require('../controllers/applicationsController');
 
 router.get('/', auth, getApplications);
@@ -14,6 +14,8 @@ router.post('/auto-submit', auth, autoSubmitApplication);   // NEW: AI auto-subm
 router.put('/:id', auth, updateApplication);
 router.post('/:id/submit', auth, submitApplication);
 router.post('/:id/ai-answers', auth, generateAIAnswers);    // NEW: Generate AI answers for review page
+router.post('/:id/tailor', auth, tailorApplication);        // NEW: Tailor application & audit skill gaps
+router.post('/sessions/:sessionId/log', updateSessionLog);  // NEW: Callback for live log updates (no auth for internal microservice call)
 router.get('/:id/status', auth, getStatus);
 router.delete('/:id', auth, deleteApplication);
 

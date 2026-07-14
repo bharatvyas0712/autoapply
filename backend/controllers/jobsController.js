@@ -108,13 +108,20 @@ exports.scrapeJob = async (req, res) => {
 // POST /api/jobs/search — search jobs using automation service
 exports.searchJobs = async (req, res) => {
   try {
-    const { query, location } = req.body;
+    const { query, location, source, experience_level, job_type, easy_apply_only } = req.body;
     if (!query) return res.status(400).json({ success: false, message: 'Query is required.' });
 
     const response = await axios.post(
       `${process.env.AUTOMATION_SERVICE_URL}/search_jobs`,
-      { query, location: location || 'Remote', source: req.body.source || 'linkedin' },
-      { timeout: 60000 }
+      {
+        query,
+        location: location || 'Remote',
+        source: source || 'all',
+        experience_level: experience_level || '',
+        job_type: job_type || '',
+        easy_apply_only: !!easy_apply_only
+      },
+      { timeout: 90000 }
     );
 
     if (response.data?.success) {

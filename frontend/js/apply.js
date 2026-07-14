@@ -7,6 +7,7 @@ requireAuth();
 let applicationId = null;
 let applicationData = null;
 let pollingInterval = null;
+let tailoredCoverLetter = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   injectSidebar('jobs');
@@ -208,9 +209,42 @@ function startPolling() {
   pollingInterval = setInterval(async () => {
     try {
       const res = await api.get(`/applications/${applicationId}/status`);
+      
+      // Update logs in real time
+      if (res.session_log) {
+        let logs = [];
+        try {
+          logs = typeof res.session_log === 'string' ? JSON.parse(res.session_log) : res.session_log;
+        } catch (e) {
+          console.warn('Failed to parse logs:', e);
+        }
+        if (Array.isArray(logs) && logs.length > 0) {
+          const logBox = document.getElementById('live-logs-container');
+          if (logBox) {
+            logBox.innerHTML = logs.map(l => {
+              const timeStr = l.time ? new Date(l.time).toLocaleTimeString() : '';
+              const colorMap = { ok: '#10b981', warn: '#ff9900', error: '#ef4444', info: '#60a5fa' };
+              const color = colorMap[l.status] || 'var(--text-secondary)';
+              return `<div style="margin-bottom:4px; line-height:1.4;"><span style="color:var(--text-muted);">${timeStr}</span> <span style="color:${color};">[${(l.status || 'info').toUpperCase()}]</span> ${l.message}</div>`;
+            }).join('');
+            logBox.scrollTop = logBox.scrollHeight;
+          }
+        }
+      }
+
+      // Update progress bar based on actual step percentage
+      if (res.steps_total > 0) {
+        if (window._progressInterval) {
+          clearInterval(window._progressInterval);
+          window._progressInterval = null;
+        }
+        const pct = Math.round((res.steps_completed / res.steps_total) * 100);
+        document.getElementById('submission-progress').style.width = `${Math.max(20, pct)}%`;
+      }
+
       if (res.status === 'submitted') {
         clearInterval(pollingInterval);
-        clearInterval(window._progressInterval);
+        if (window._progressInterval) clearInterval(window._progressInterval);
         document.getElementById('submission-progress').style.width = '100%';
         document.getElementById('status-heading').innerText = 'Application Submitted!';
         document.getElementById('status-message').innerText = 'Your application was successfully submitted. Check your inbox for a confirmation.';
@@ -218,7 +252,7 @@ function startPolling() {
         setTimeout(() => showSuccessModal(), 1500);
       } else if (res.status === 'failed') {
         clearInterval(pollingInterval);
-        clearInterval(window._progressInterval);
+        if (window._progressInterval) clearInterval(window._progressInterval);
         document.getElementById('status-heading').innerText = 'Submission Failed';
         document.getElementById('status-message').innerText = res.error_message || res.sess_error || 'The automation engine encountered an error.';
         document.getElementById('status-spinner').style.display = 'none';
@@ -299,8 +333,85 @@ async function aiAutoSubmit() {
       aiSubmitBtn.innerHTML = '🤖 AI Auto-Submit';
     }
   } catch (err) {
-    showToast('Could not reach automation service.', 'error');
     aiSubmitBtn.disabled = false;
     aiSubmitBtn.innerHTML = '🤖 AI Auto-Submit';
+  }
+}
+
+async function analyzeAndTailor() {
+  const btn = document.getElementById('tailor-analyze-btn');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Analyzing Gaps &amp; Tailoring...';
+  }
+  showToast('Comparing resume with job description...', 'info');
+
+  try {
+    const res = await api.post(`/applications/${applicationId}/tailor`, {});
+    if (res.success && res.data) {
+      const data = res.data;
+      tailoredCoverLetter = data.tailored_cover_letter || '';
+
+      // Populate Skill Gaps
+      const gapsList = document.getElementById('tailor-gaps-list');
+      if (gapsList) {
+        if (!data.skill_gaps || data.skill_gaps.length === 0) {
+          gapsList.innerHTML = '<div style="font-size:12px; color:var(--text-muted); font-style:italic;">No significant skill gaps found! Excellent fit.</div>';
+        } else {
+          gapsList.innerHTML = data.skill_gaps.map(g => {
+            const badgeClass = g.importance === 'High' ? 'badge-red' : (g.importance === 'Medium' ? 'badge-yellow' : 'badge-gray');
+            return `
+              <div style="background:var(--bg-input); padding:8px 12px; border-radius:6px; border:1px solid var(--border-color); font-size:12px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                  <strong style="color:var(--text-primary);">${g.skill}</strong>
+                  <span class="badge ${badgeClass}">${g.importance} Importance</span>
+                </div>
+                <div style="color:var(--text-secondary); line-height:1.3;">${g.advice}</div>
+              </div>
+            `;
+          }).join('');
+        }
+      }
+
+      // Populate Suggestions
+      const suggestionsList = document.getElementById('tailor-suggestions-list');
+      if (suggestionsList) {
+        if (!data.resume_suggestions || data.resume_suggestions.length === 0) {
+          suggestionsList.innerHTML = '<div style="font-size:12px; color:var(--text-muted); font-style:italic;">No specific layout or summary updates needed.</div>';
+        } else {
+          suggestionsList.innerHTML = data.resume_suggestions.map(s => `
+            <div style="background:var(--bg-input); padding:8px 12px; border-radius:6px; border:1px solid var(--border-color); font-size:12px;">
+              <div style="font-weight:600; color:var(--text-primary); margin-bottom:2px; font-size:11px; text-transform:uppercase; letter-spacing:0.5px;">Section: ${s.section}</div>
+              <div style="color:var(--text-secondary); line-height:1.3;">${s.suggestion}</div>
+            </div>
+          `).join('');
+        }
+      }
+
+      document.getElementById('tailor-results-container').style.display = 'block';
+      showToast('Skill gaps and suggestions loaded!', 'success');
+    } else {
+      showToast(res.message || 'Failed to tailor application.', 'error');
+    }
+  } catch (err) {
+    console.error(err);
+    showToast('Error during gap analysis.', 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '🔍 Re-Analyze Skill Gaps &amp; Tailor';
+    }
+  }
+}
+
+function applyTailoredCoverLetter() {
+  if (!tailoredCoverLetter) {
+    showToast('No tailored cover letter generated yet.', 'error');
+    return;
+  }
+  const textarea = document.getElementById('field-cover-letter');
+  if (textarea) {
+    textarea.value = tailoredCoverLetter;
+    showToast('Tailored cover letter applied! Click "Save Draft" to preserve it.', 'success');
   }
 }

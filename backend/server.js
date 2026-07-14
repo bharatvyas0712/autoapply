@@ -19,7 +19,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Rate limiting
-const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 200, message: { success: false, message: 'Too many requests.' } });
+const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 2000, message: { success: false, message: 'Too many requests.' } });
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, message: { success: false, message: 'Too many auth attempts.' } });
 app.use('/api/', limiter);
 app.use('/api/auth/login', authLimiter);
@@ -40,10 +40,14 @@ app.use('/api/agent', require('./routes/agent'));
 app.get('/api/health', (req, res) => res.json({ success: true, message: 'AutoJobApply API is running 🚀' }));
 
 // ── Serve Frontend for all non-API routes ──────────────────────
-app.get('/{*path}', (req, res) => {
+app.use((req, res) => {
   if (req.path.startsWith('/api')) {
-    return res.status(404).json({ success: false, message: 'API endpoint not found.' });
+    return res.status(404).json({
+      success: false,
+      message: 'API endpoint not found.'
+    });
   }
+
   res.sendFile(path.join(__dirname, '..', 'frontend', 'index.html'));
 });
 

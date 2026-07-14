@@ -58,6 +58,7 @@ services:
     environment:
       PORT: 5001
       FORM_AGENT_SERVICE_URL: http://backend:3000
+      BACKEND_API_URL: http://backend:3000
       AUTOJOBAPPLY_LOGIN_WAIT_SECONDS: 600
       AUTOJOBAPPLY_FIELD_REVIEW_TIMEOUT_SECONDS: 900
     ports:

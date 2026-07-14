@@ -33,13 +33,73 @@
         </div>
 
         <!-- Discover Jobs Search Bar -->
-        <div class="card" style="margin-bottom: 24px; padding: 16px; background: linear-gradient(135deg, rgba(20,110,180,0.06), rgba(255,153,0,0.08)); border-color: rgba(20,110,180,0.2);">
-          <div style="font-weight: 700; margin-bottom: 12px; font-size: 14px;">🔍 Discover New Jobs (LinkedIn Public Search)</div>
-          <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <div class="card" style="margin-bottom: 24px; padding: 20px; background: linear-gradient(135deg, rgba(20,110,180,0.06), rgba(255,153,0,0.08)); border-color: rgba(20,110,180,0.2);">
+          <div style="font-weight: 700; margin-bottom: 14px; font-size: 15px; display: flex; align-items: center; gap: 8px;">🔍 Discover New Jobs</div>
+
+          <!-- Row 1: Query + Location -->
+          <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px;">
             <input type="text" id="discover-query" class="form-control" placeholder="Job Title (e.g. Software Engineer)" style="flex: 2; min-width: 200px;">
-            <input type="text" id="discover-location" class="form-control" placeholder="Location (e.g. Remote or New York)" style="flex: 1; min-width: 150px;">
-            <button class="btn btn-primary" id="discover-btn" onclick="discoverJobs()">Search Jobs</button>
+            <input type="text" id="discover-location" class="form-control" placeholder="Location (e.g. Remote or Bangalore)" style="flex: 1; min-width: 150px;">
           </div>
+
+          <!-- Row 2: Advanced Filters -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; margin-bottom: 14px;">
+            <!-- Experience Level -->
+            <div>
+              <label class="form-label" style="margin-bottom: 4px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Experience Level</label>
+              <select id="discover-experience" class="form-control" style="padding: 9px 12px; font-size: 13px;">
+                <option value="">Any Level</option>
+                <option value="fresher">🎓 Fresher / Intern</option>
+                <option value="entry">🟢 Entry Level (0-2 yrs)</option>
+                <option value="mid">🔵 Mid Level (3-5 yrs)</option>
+                <option value="senior">🟠 Senior Level (5+ yrs)</option>
+              </select>
+            </div>
+
+            <!-- Job Source -->
+            <div>
+              <label class="form-label" style="margin-bottom: 4px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Job Source</label>
+              <select id="discover-source" class="form-control" onchange="onSourceChange()" style="padding: 9px 12px; font-size: 13px;">
+                <option value="all">🌐 All Sources</option>
+                <option value="linkedin">💼 LinkedIn</option>
+                <option value="indeed">📋 Indeed</option>
+                <option value="naukri">📋 Naukri</option>
+                <option value="ats">🏢 ATS (Greenhouse + Lever)</option>
+              </select>
+            </div>
+
+            <!-- Job Type -->
+            <div>
+              <label class="form-label" style="margin-bottom: 4px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Job Type</label>
+              <select id="discover-jobtype" class="form-control" style="padding: 9px 12px; font-size: 13px;">
+                <option value="">All Types</option>
+                <option value="full-time">💼 Full-time</option>
+                <option value="part-time">⏰ Part-time</option>
+                <option value="contract">📝 Contract</option>
+                <option value="internship">🎓 Internship</option>
+              </select>
+            </div>
+
+            <!-- Easy Apply Toggle -->
+            <div id="easy-apply-wrap">
+              <label class="form-label" style="margin-bottom: 4px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Quick Apply</label>
+              <div style="display: flex; align-items: center; gap: 8px; padding: 9px 12px; background: var(--bg-input); border: 1.5px solid var(--border-input); border-radius: 10px;">
+                <label class="toggle" style="gap: 6px; margin: 0;">
+                  <input type="checkbox" id="discover-easy-apply">
+                  <div class="toggle-track" style="width: 36px; height: 20px;">
+                    <div class="toggle-thumb" style="width: 14px; height: 14px;"></div>
+                  </div>
+                  <span style="font-size: 12px; font-weight: 600; color: var(--text-secondary);">Easy Apply Only</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Search Button -->
+          <button class="btn btn-primary" id="discover-btn" onclick="discoverJobs()" style="width: 100%; padding: 12px; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+            🚀 Search Jobs
+          </button>
+
           <div id="discover-results" style="margin-top: 16px; display: none;">
             <!-- Injected via JS -->
           </div>

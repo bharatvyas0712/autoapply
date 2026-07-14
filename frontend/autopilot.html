@@ -58,12 +58,33 @@
               <input type="text" id="agent-location" class="form-control" placeholder="Auto from profile">
             </div>
             <div class="form-group" style="max-width: 200px;">
+              <label class="form-label">Experience Level</label>
+              <select id="agent-experience" class="form-control">
+                <option value="">Any Level</option>
+                <option value="fresher">🎓 Fresher / Intern</option>
+                <option value="entry">🟢 Entry Level (0-2 yrs)</option>
+                <option value="mid">🔵 Mid Level (3-5 yrs)</option>
+                <option value="senior">🟠 Senior Level (5+ yrs)</option>
+              </select>
+            </div>
+            <div class="form-group" style="max-width: 200px;">
               <label class="form-label">Source</label>
               <select id="agent-source" class="form-control" onchange="toggleEasyApplyOption()">
                 <option value="all">All Sources (widest reach)</option>
                 <option value="ats">Company Boards (reliable)</option>
                 <option value="indeed">Indeed</option>
+                <option value="naukri">Naukri</option>
                 <option value="linkedin">LinkedIn</option>
+              </select>
+            </div>
+            <div class="form-group" style="max-width: 180px;">
+              <label class="form-label">Job Type</label>
+              <select id="agent-jobtype" class="form-control">
+                <option value="">All Types</option>
+                <option value="full-time">💼 Full-time</option>
+                <option value="part-time">⏰ Part-time</option>
+                <option value="contract">📝 Contract</option>
+                <option value="internship">🎓 Internship</option>
               </select>
             </div>
             <div class="form-group" style="max-width: 130px;">

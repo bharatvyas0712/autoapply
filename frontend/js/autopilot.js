@@ -14,8 +14,8 @@ document.addEventListener('DOMContentLoaded', () => {
 function toggleEasyApplyOption() {
   const source = document.getElementById('agent-source').value;
   const group = document.getElementById('easy-apply-group');
-  group.style.display = (source === 'indeed') ? 'block' : 'none';
-  if (source !== 'indeed') document.getElementById('agent-easy-apply').checked = false;
+  group.style.display = (source === 'indeed' || source === 'all') ? 'block' : 'none';
+  if (source !== 'indeed' && source !== 'all') document.getElementById('agent-easy-apply').checked = false;
 }
 
 async function runAgent() {
@@ -28,7 +28,9 @@ async function runAgent() {
     location: document.getElementById('agent-location').value.trim() || undefined,
     min_score: parseInt(document.getElementById('agent-minscore').value, 10) || 0,
     source: document.getElementById('agent-source').value,
-    easy_apply_only: document.getElementById('agent-source').value === 'indeed'
+    experience_level: document.getElementById('agent-experience').value,
+    job_type: document.getElementById('agent-jobtype').value,
+    easy_apply_only: (document.getElementById('agent-source').value === 'indeed' || document.getElementById('agent-source').value === 'all')
       && document.getElementById('agent-easy-apply').checked,
   };
 

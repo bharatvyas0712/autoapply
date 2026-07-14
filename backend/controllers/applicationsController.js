@@ -3,6 +3,33 @@ const axios = require('axios');
 const path = require('path');
 require('dotenv').config();
 
+class AsyncQueue {
+  constructor() {
+    this.queue = [];
+    this.isProcessing = false;
+  }
+  async add(task) {
+    return new Promise((resolve, reject) => {
+      this.queue.push({ task, resolve, reject });
+      if (!this.isProcessing) this.process();
+    });
+  }
+  async process() {
+    this.isProcessing = true;
+    while (this.queue.length > 0) {
+      const { task, resolve, reject } = this.queue.shift();
+      try {
+        const result = await task();
+        resolve(result);
+      } catch (err) {
+        reject(err);
+      }
+    }
+    this.isProcessing = false;
+  }
+}
+const autoSubmitQueue = new AsyncQueue();
+
 // GET /api/applications
 exports.getApplications = async (req, res) => {
   try {
@@ -177,6 +204,7 @@ exports.submitApplication = async (req, res) => {
     );
     const resumeText = profileRows[0]?.resume_text || '';
 
+    autoSubmitQueue.add(async () => {
     try {
       const response = await axios.post(
         `${process.env.AUTOMATION_SERVICE_URL}/apply`,
@@ -228,6 +256,7 @@ exports.submitApplication = async (req, res) => {
         [automErr.message, sessionId]
       );
     }
+    });
   } catch (err) {
     console.error('submitApplication error:', err);
     return res.status(500).json({ success: false, message: 'Server error.' });
@@ -589,6 +618,7 @@ Output Rules:
 
     // Trigger automation service async
     const resumePath = formData.resume_url ? path.join(__dirname, '..', formData.resume_url) : null;
+    autoSubmitQueue.add(async () => {
     try {
       const response = await axios.post(
         `${process.env.AUTOMATION_SERVICE_URL}/apply`,
@@ -629,8 +659,43 @@ Output Rules:
         [automErr.message, sessionId]
       );
     }
+    });
   } catch (err) {
     console.error('autoSubmitApplication error:', err);
     return res.status(500).json({ success: false, message: 'Server error.' });
+  }
+};
+
+// POST /api/applications/:id/tailor
+// Analyze gaps in candidate resume against the job description & suggest improvements and tailored cover letter
+exports.tailorApplication = async (req, res) => {
+  try {
+    const { id } = req.params;
+    // Just return a dummy response for now so the UI doesn't break
+    res.json({
+      success: true,
+      analysis: "This is a placeholder for the tailor application feature. Your resume looks good but you might want to add more keywords related to the job description.",
+      tailored_cover_letter: "Dear Hiring Manager,\\n\\nI am very interested in this position.\\n\\nSincerely,\\nApplicant"
+    });
+  } catch (err) {
+    console.error('tailorApplication error:', err);
+    res.status(500).json({ success: false, message: 'Server error.' });
+  }
+};
+
+// POST /api/applications/sessions/:sessionId/log
+// Callback for live log updates (no auth for internal microservice call)
+exports.updateSessionLog = async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const { log, steps_done, steps_total } = req.body;
+    await require('../config/db').query(
+      'UPDATE automation_sessions SET session_log = ?, steps_completed = ?, steps_total = ? WHERE id = ?',
+      [JSON.stringify(log || []), steps_done || 0, steps_total || 0, sessionId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('updateSessionLog error:', err);
+    res.status(500).json({ success: false, message: 'Server error.' });
   }
 };

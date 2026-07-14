@@ -1,7 +1,7 @@
 /* ================================================================
    AutoJobApply — Main CSS (Design System, Layout, Typography)
 ================================================================ */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700;800&display=swap');
 @import 'theme.css';
 @import 'components.css';
 
@@ -12,10 +12,17 @@ html { scroll-behavior: smooth; font-size: 16px; }
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   background: var(--bg-primary);
+  background-image: radial-gradient(circle at 10% 20%, rgba(0, 114, 255, 0.03) 0%, transparent 40%),
+                    radial-gradient(circle at 90% 80%, rgba(255, 140, 0, 0.03) 0%, transparent 40%);
   color: var(--text-primary);
   line-height: 1.6;
   min-height: 100vh;
   transition: background 0.3s ease, color 0.3s ease;
+}
+
+h1, h2, h3, h4, h5, h6, .topbar-title, .logo-text, .stat-number, .sidebar-logo .logo-text {
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.02em;
 }
 
 /* Scrollbar */

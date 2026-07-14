@@ -18,36 +18,36 @@ const SKILL_DICTIONARY = {
   Python: ['python'],
   Java: ['java'],
   'C++': ['c++', 'cpp'],
-  'C#': ['c#', '.net', 'dotnet'],
-  Go: ['golang', 'go'],
-  Ruby: ['ruby', 'rails'],
+  'C#': ['c#', '.net', 'dotnet', 'asp.net'],
+  Go: ['golang', 'go', 'go language'],
+  Ruby: ['ruby', 'rails', 'ruby on rails'],
   PHP: ['php', 'laravel'],
-  React: ['react', 'reactjs', 'react.js'],
+  React: ['react', 'reactjs', 'react.js', 'react js'],
   Angular: ['angular'],
-  'Vue.js': ['vue', 'vuejs', 'vue.js'],
-  'Node.js': ['node', 'nodejs', 'node.js'],
+  'Vue.js': ['vue', 'vuejs', 'vue.js', 'vue js'],
+  'Node.js': ['node', 'nodejs', 'node.js', 'node js'],
   Express: ['express'],
   Django: ['django'],
   Flask: ['flask'],
   Spring: ['spring boot', 'spring'],
-  HTML: ['html'],
-  CSS: ['css', 'scss', 'sass', 'tailwind'],
-  SQL: ['sql'],
+  HTML: ['html', 'hypertext markup language'],
+  CSS: ['css', 'scss', 'sass', 'tailwind', 'cascading style sheets'],
+  SQL: ['sql', 'rdbms', 'database', 'databases'],
   MySQL: ['mysql'],
   PostgreSQL: ['postgres', 'postgresql'],
   MongoDB: ['mongodb', 'mongo'],
   Redis: ['redis'],
   GraphQL: ['graphql'],
-  'REST API': ['rest', 'restful', 'api'],
-  AWS: ['aws', 'amazon web services'],
-  Azure: ['azure'],
-  GCP: ['gcp', 'google cloud'],
-  Docker: ['docker'],
+  'REST API': ['rest', 'restful', 'api', 'apis', 'web services'],
+  AWS: ['aws', 'amazon web services', 'amazon cloud'],
+  Azure: ['azure', 'microsoft azure'],
+  GCP: ['gcp', 'google cloud', 'google cloud platform'],
+  Docker: ['docker', 'docker container', 'docker containers'],
   Kubernetes: ['kubernetes', 'k8s'],
-  'CI/CD': ['ci/cd', 'jenkins', 'github actions', 'gitlab ci'],
+  'CI/CD': ['ci/cd', 'ci / cd', 'jenkins', 'github actions', 'gitlab ci', 'continuous integration', 'continuous delivery'],
   Git: ['git', 'github', 'gitlab'],
   Linux: ['linux', 'unix'],
-  'Machine Learning': ['machine learning', 'ml', 'tensorflow', 'pytorch', 'scikit'],
+  'Machine Learning': ['machine learning', 'ml', 'deep learning', 'dl', 'tensorflow', 'pytorch', 'scikit', 'neural networks'],
   'Data Analysis': ['data analysis', 'pandas', 'numpy'],
   Flutter: ['flutter', 'dart'],
   'React Native': ['react native'],
@@ -66,8 +66,18 @@ function escapeRe(s) {
 
 // Match a needle only at alphanumeric boundaries, so "java" does NOT match
 // inside "javascript" and "go" does NOT match inside "golang".
+// Handles special characters like .net, c++, c# correctly.
 function hasNeedle(hay, needle) {
-  const re = new RegExp(`(?<![a-z0-9])${escapeRe(needle)}(?![a-z0-9])`, 'i');
+  let pattern;
+  const escaped = escapeRe(needle);
+  if (needle.startsWith('.')) {
+    pattern = `(?<![a-z0-9](?<!asp))${escaped}(?![a-z0-9])`;
+  } else if (needle.endsWith('++') || needle.endsWith('#')) {
+    pattern = `(?<![a-z0-9])${escaped}`;
+  } else {
+    pattern = `(?<![a-z0-9])${escaped}(?![a-z0-9])`;
+  }
+  const re = new RegExp(pattern, 'i');
   return re.test(hay);
 }
 
