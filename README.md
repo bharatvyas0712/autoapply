@@ -1,247 +1,104 @@
-# AutoJobApply — Automated Job Application Portal
+# 🚀 AutoJobApply — Automated Job Application Portal
 
-A professional, multi-user web portal that automatically applies to jobs using Playwright browser automation, PDF resume parsing, and a human-in-the-loop review step before submission.
+![Version](https://img.shields.io/badge/version-2.0.0-blue.svg?cacheSeconds=2592000)
+![Node](https://img.shields.io/badge/Node.js-18.x-green.svg)
+![Python](https://img.shields.io/badge/Python-3.10+-yellow.svg)
+![Playwright](https://img.shields.io/badge/Playwright-Browser_Automation-orange.svg)
+![MySQL](https://img.shields.io/badge/MySQL-8.0-blue.svg)
+
+> A powerful, multi-user web portal that automatically applies to jobs using Playwright browser automation. It features PDF resume parsing, automated form-filling, Naukri.com support, and a human-in-the-loop review system.
 
 ---
 
-## � Quick Start with Docker (Recommended)
+## ✨ Key Features
 
-The fastest way to get started is using Docker Compose:
+- 🤖 **Playwright Automation:** Uses real Chromium browsers to bypass bot detection and fill out complex job applications.
+- 📄 **Smart Resume Parsing:** Automatically extracts skills, experience, and contact details from your uploaded PDF resume.
+- 🎯 **Naukri.com Integration:** Supports custom scripts to easily apply to Naukri jobs (Fresher, Experienced, specific locations).
+- ✈️ **Autopilot Mode:** Queue up multiple job links and let the system apply to them in the background while you sleep.
+- 🧑‍💻 **Human-in-the-loop:** Review the pre-filled forms before the bot hits "Submit" to ensure 100% accuracy.
+- 🎨 **Modern Dashboard:** Beautiful, responsive UI with Dark/Light mode support.
+
+---
+
+## 🛠️ Technology Stack
+
+| Component | Technology | Description |
+|-----------|------------|-------------|
+| **Frontend** | HTML, CSS, JS | Vanilla JS with responsive, modern UI components. |
+| **Backend API** | Node.js, Express | Handles user auth, job queues, and API routing. |
+| **Database** | MySQL | Stores user profiles, application history, and jobs. |
+| **Automation** | Python, Playwright | Drives the browser, handles interactions and wait-states. |
+
+---
+
+## 💻 Local Setup (Using Docker - Recommended)
+
+The fastest way to run the project locally is via Docker Compose.
 
 ```bash
-# Copy environment file
+# 1. Clone the repository
+git clone https://github.com/bharatvyas0712/autoapply.git
+cd autoapply
+
+# 2. Setup Environment Variables
 cp .env.example .env
+# Edit .env and set your DB_PASSWORD=your_password_here
 
-# Edit .env and set your MySQL password
-# DB_PASSWORD=your_mysql_password_here
-
-# Start all services
+# 3. Start all services (Database, Backend, and Python Automation)
 docker-compose up -d
-
-# Check service status
-docker-compose ps
-
-# View logs
-docker-compose logs -f
 ```
-
-Services will be available at:
-- **Frontend & API**: http://localhost:3000
-- **Automation Service**: http://localhost:5001
-- **MySQL**: localhost:3306
+🌐 The portal will be live at: **http://localhost:3000**
 
 ---
 
-## 🛠️ Manual Setup
+## ☁️ Free Cloud Deployment (Zero Cost Setup)
 
-### 1. MySQL Database
-1. Open **MySQL Workbench**
-2. Connect to your local MySQL server
-3. Open and run: `backend/models/db_schema.sql`
-4. This creates the `autojobapply` database with all 5 tables.
+If you want to host this on the internet 24/7 for free, you can split the services to bypass RAM limits on free tiers (since Playwright needs 1GB+ RAM).
 
-### 2. Backend (Node.js)
-```powershell
-# Navigate to backend
-cd backend
+### 1. Database (Aiven.io)
+- Create a free MySQL database on [Aiven.io](https://aiven.io/).
+- Copy your connection details (Host, Port, User, Password).
 
-# Copy and edit .env file
-cp .env.example .env
-# Edit .env — set your MySQL password
-# DB_PASSWORD=your_mysql_password_here
+### 2. Backend (Render.com)
+- Go to [Render](https://render.com/), create a **Web Service**, and connect this GitHub repo.
+- Select `backend` as the root directory.
+- Set Build command to `npm install` and Start command to `npm start`.
+- Add your Database connection details in Render's Environment Variables.
 
-# Install dependencies
-npm install
-
-# Start server
-npm start
-```
-The API runs on **http://localhost:3000**
-
-### 3. Automation Service (Python)
-```powershell
-# Navigate to automation folder
+### 3. Automation Worker (Local Machine)
+Since free cloud servers only provide 512MB RAM, Playwright will crash. Run the worker locally to handle the heavy lifting:
+```bash
 cd automation
-
-# Create virtual environment (recommended)
-python -m venv venv
-venv\Scripts\activate
-
-# Install dependencies
 pip install -r requirements.txt
-
-# Install Playwright browsers
 playwright install chromium
-
-# Start service
-python app.py
 ```
-The automation service runs on **http://localhost:5001**
+Update your `automation/.env` to point to your Render Backend:
+`BACKEND_API_URL=https://your-render-url.onrender.com`
 
-### 4. Open the App
-Navigate to **http://localhost:3000** in your browser.
+Run the worker: `python app.py`
 
 ---
 
-## 🚀 User Flow
+## 📂 Project Structure
 
-1. **Register / Login** → Create your account
-2. **Profile Wizard** → Upload PDF resume (auto-parsed) → Fill personal info, skills, work history, Q&A defaults
-3. **Add Jobs** → Paste any carrier job URL on the Dashboard OR use Jobs board
-4. **Apply** → Click Apply → System pre-fills all form fields from your profile
-5. **Review** → Edit any field, answer Yes/No questions, update cover letter
-6. **Confirm & Submit** → Playwright opens the real job site, fills the form, uploads your resume, and submits
-7. **History** → Track all applications and their statuses
-
----
-
-## 📁 Project Structure
-
-```
+```text
 AutoJobApply/
-├── backend/
-│   ├── server.js          ← Express entry point (port 3000)
-│   ├── .env               ← ⚠️ Edit this with your DB password
-│   ├── config/db.js       ← MySQL connection pool
-│   ├── middleware/        ← JWT auth, file upload
-│   ├── routes/            ← API routes (auth, profile, jobs, applications)
-│   ├── controllers/       ← Business logic
-│   ├── models/
-│   │   └── db_schema.sql  ← Run this in MySQL Workbench first!
-│   └── uploads/           ← Resumes and profile photos stored here
-│
-├── automation/
-│   ├── app.py             ← Flask service (port 5001)
-│   ├── form_filler.py     ← Playwright engine with retry logic
-│   ├── job_searcher.py    ← Job search across multiple platforms
-│   ├── logger_config.py   ← Structured logging configuration
-│   ├── retry_utils.py     ← Exponential backoff retry logic
-│   ├── config_validator.py ← Environment validation
-│   └── requirements.txt
-│
-├── frontend/
-│   ├── index.html         ← Login
-│   ├── register.html
-│   ├── dashboard.html
-│   ├── profile.html       ← Step wizard
-│   ├── jobs.html
-│   ├── apply.html         ← ⭐ Review before submit
-│   ├── history.html
-│   ├── settings.html
-│   ├── css/               ← main.css, theme.css, components.css
-│   └── js/                ← api.js, auth.js, dashboard.js, profile.js, jobs.js, apply.js, history.js, settings.js, theme.js
-│
-├── docker-compose.yml    ← Docker orchestration
-├── Dockerfile            ← Backend container
-├── automation/Dockerfile  ← Automation service container
-└── .env.example          ← Environment variables template
+├── backend/               # Node.js API, JWT Auth, Database logic
+├── automation/            # Python Playwright scripts, job_searcher.py
+├── frontend/              # User Interface (Dashboard, Apply, Autopilot)
+├── browser_profile/       # Stores browser session (cookies, logins)
+├── docker-compose.yml     # Orchestration for local setup
+└── Dockerfile             # Container configuration
 ```
 
 ---
 
-## ⚙️ Environment Variables
+## 📝 Important Notes
 
-### Backend (.env)
-| Variable | Description | Default |
-|---|---|---|
-| `PORT` | Backend port | 3000 |
-| `DB_HOST` | MySQL host | localhost |
-| `DB_PORT` | MySQL port | 3306 |
-| `DB_USER` | MySQL username | root |
-| `DB_PASSWORD` | ⚠️ **Set your MySQL password here** | - |
-| `DB_NAME` | Database name | autojobapply |
-| `JWT_SECRET` | Change this to a random string in production | - |
-| `AUTOMATION_SERVICE_URL` | Python service URL | http://localhost:5001 |
-
-### Automation Service
-| Variable | Description | Default |
-|---|---|---|
-| `PORT` | Flask service port | 5001 |
-| `FORM_AGENT_SERVICE_URL` | Form agent service URL | http://localhost:5006 |
-| `AUTOJOBAPPLY_LOGIN_WAIT_SECONDS` | Login wait timeout | 600 |
-| `AUTOJOBAPPLY_FIELD_REVIEW_TIMEOUT_SECONDS` | Field review timeout | 900 |
-| `AUTOJOBAPPLY_PROFILE_DIR` | Browser profile directory | - |
+- **Browser Sessions:** The system saves cookies in `browser_profile/` so you don't have to log into job portals (like LinkedIn or Naukri) every single time.
+- **Bot Detection:** If a site detects the bot, you may need to manually log in once using the non-headless browser mode.
+- **Autopilot:** Leave your computer running while Autopilot processes your job queue!
 
 ---
-
-## 🔧 Health Checks
-
-### Automation Service
-```bash
-# Basic health check
-curl http://localhost:5001/health
-
-# Detailed health check with system info
-curl http://localhost:5001/health/detailed
-```
-
-### Backend API
-```bash
-# API health check
-curl http://localhost:3000/api/health
-```
-
----
-
-## 🎨 Design System
-
-- **Theme**: Amazon-inspired dark/light mode with `#FF9900` orange accent
-- **Font**: Inter (Google Fonts)
-- **Dark mode default** — toggle in topbar or Settings page
-- Fully responsive for desktop and tablet
-
----
-
-## 🔒 Security & Reliability Improvements
-
-- **Structured Logging**: All operations logged with timestamps and severity levels
-- **Retry Logic**: Exponential backoff for network failures and timeouts
-- **Error Handling**: Comprehensive error handling with detailed logging
-- **Health Checks**: Endpoint monitoring for service availability
-- **Environment Validation**: Configuration validation on startup
-- **Docker Support**: Containerized deployment for consistency
-
----
-
-## ⚠️ Important Notes
-
-- The automation service uses **Playwright Chromium** — a real browser window opens during application submission
-- Always **review the form before confirming** — the automation fills fields but you approve first
-- Resume PDF parsing extracts skills, phone, experience years using pattern matching
-- For sites with heavy anti-bot detection (LinkedIn, etc.), you may need to log in to those sites first in a separate browser tab
-- Logs are stored in `automation/logs/` for debugging
-- Browser profile is maintained in `browser_profile/` for session persistence
-
----
-
-## 🐛 Troubleshooting
-
-### Port Already in Use
-```bash
-# Windows
-netstat -ano | findstr :3000
-netstat -ano | findstr :5001
-
-# Kill process if needed
-taskkill /PID <PID> /F
-```
-
-### Playwright Browser Issues
-```bash
-# Reinstall Playwright browsers
-playwright install chromium --force
-```
-
-### Docker Issues
-```bash
-# Rebuild containers
-docker-compose down
-docker-compose build --no-cache
-docker-compose up -d
-```
-
-### Database Connection Issues
-1. Verify MySQL is running
-2. Check credentials in .env file
-3. Ensure database schema is imported
-4. Check MySQL port (default: 3306)
+*Made with ❤️ to make job hunting effortless.*
