@@ -73,6 +73,7 @@ services:
     container_name: autojobapply_automation
     environment:
       PORT: 5001
+      PLAYWRIGHT_HEADLESS: "true"
       FORM_AGENT_SERVICE_URL: http://backend:3000
       BACKEND_API_URL: http://backend:3000
       AUTOJOBAPPLY_LOGIN_WAIT_SECONDS: 600

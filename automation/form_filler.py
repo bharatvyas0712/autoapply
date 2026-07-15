@@ -23,6 +23,7 @@ from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeo
 from logger_config import logger
 from retry_utils import retry_with_backoff, retry_operation
 FORM_AGENT_SERVICE_URL = os.environ.get("FORM_AGENT_SERVICE_URL", "http://localhost:5006")
+HEADLESS = os.getenv("PLAYWRIGHT_HEADLESS", "true").lower() == "true"
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
@@ -83,7 +84,14 @@ def scrape_job_page(url: str) -> dict:
     }
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = p.chromium.launch(
+            headless=HEADLESS,
+            args=[
+                "--disable-blink-features=AutomationControlled",
+                "--disable-dev-shm-usage",
+                "--no-sandbox"
+            ]
+        )
         ctx = browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
         )
@@ -188,7 +196,14 @@ def analyze_form_fields(url: str) -> list:
     fields = []
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = p.chromium.launch(
+            headless=HEADLESS,
+            args=[
+                "--disable-blink-features=AutomationControlled",
+                "--disable-dev-shm-usage",
+                "--no-sandbox"
+            ]
+        )
         ctx = browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
         )
@@ -344,7 +359,7 @@ def _fill_and_submit_form_impl(
     with sync_playwright() as p:
         # Use the ONE shared, logged-in profile so we reuse the sessions you
         # already established on LinkedIn / Indeed / etc. — no re-login.
-        ctx = launch_logged_in_context(p, headless=False, slow_mo=300, user_id=user_id, session_id=session_id)
+        ctx = launch_logged_in_context(p, headless=HEADLESS, slow_mo=300, user_id=user_id, session_id=session_id)
         page = ctx.new_page()
 
         did_manual_login = False
@@ -842,7 +857,7 @@ def get_shared_profile_dir(user_id: int = None, session_id: int = None) -> str:
     return path
 
 
-def launch_logged_in_context(p, headless: bool = False, slow_mo: int = 0, user_id: int = None, session_id: int = None):
+def launch_logged_in_context(p, headless: bool = HEADLESS, slow_mo: int = 0, user_id: int = None, session_id: int = None):
     """
     Launch a persistent browser context.
     - When session_id is given, uses an ephemeral session-scoped profile

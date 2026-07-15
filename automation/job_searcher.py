@@ -8,7 +8,10 @@ import re
 import random
 import urllib.parse
 import requests
+import os
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
+
+HEADLESS = os.getenv("PLAYWRIGHT_HEADLESS", "true").lower() == "true"
 
 GREENHOUSE_COMPANIES = [
     'postman', 'groww', 'phonepe', 'druva',
@@ -107,7 +110,14 @@ def search_linkedin_jobs(query: str, location: str, limit: int = 10, experience_
     search_url = f"{base_url}?{urllib.parse.urlencode(params)}"
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = p.chromium.launch(
+            headless=HEADLESS,
+            args=[
+                "--disable-blink-features=AutomationControlled",
+                "--disable-dev-shm-usage",
+                "--no-sandbox"
+            ]
+        )
         ctx = browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
         )
@@ -189,8 +199,12 @@ def search_indeed_jobs(query: str, location: str, limit: int = 15, easy_apply_on
 
     with sync_playwright() as p:
         browser = p.chromium.launch(
-            headless=True,
-            args=['--disable-blink-features=AutomationControlled']
+            headless=HEADLESS,
+            args=[
+                "--disable-blink-features=AutomationControlled",
+                "--disable-dev-shm-usage",
+                "--no-sandbox"
+            ]
         )
         ctx = browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -339,10 +353,11 @@ def search_naukri_jobs(query: str, location: str, limit: int = 15,
     with sync_playwright() as p:
         try:
             browser = p.chromium.launch(
-                headless=False,
+                headless=True,
                 args=[
-                    '--disable-blink-features=AutomationControlled',
-                    '--window-position=-3000,-3000'
+                    "--disable-blink-features=AutomationControlled",
+                    "--disable-dev-shm-usage",
+                    "--no-sandbox"
                 ]
             )
             ctx = browser.new_context(
@@ -421,9 +436,11 @@ def search_naukri_jobs(query: str, location: str, limit: int = 15,
                 ]
                 
                 cards = []
+                selector_used = "None"
                 for sel in card_selectors:
                     cards = page.query_selector_all(sel)
                     if cards:
+                        selector_used = sel
                         break
 
                 # Automatic DOM inspection fallback for selectors
@@ -448,6 +465,7 @@ def search_naukri_jobs(query: str, location: str, limit: int = 15,
                                     cards.append(p)
                                     
                 print(f"Number of job cards found: {len(cards)}")
+                print(f"Selector used: {selector_used}")
 
                 if not cards:
                     print(f"First 3000 characters of HTML:\n{content[:3000]}")
@@ -503,7 +521,10 @@ def search_naukri_jobs(query: str, location: str, limit: int = 15,
                         })
                     except Exception as e:
                         print(f"Error extracting Naukri card: {e}")
+                        traceback.print_exc()
                         continue
+                
+                print(f"First 3 extracted job titles: {[r['title'] for r in results[:3]]}")
                         
                 page.wait_for_timeout(2000)
 
@@ -516,6 +537,7 @@ def search_naukri_jobs(query: str, location: str, limit: int = 15,
                     
         except Exception as e:
             print(f"Error during Naukri search: {e}")
+            traceback.print_exc()
             traceback.print_exc()
             raise e
         finally:

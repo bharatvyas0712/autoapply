@@ -7,6 +7,7 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 
 const app = express();
+app.set("trust proxy", 1);
 
 // ── Security & Middleware ──────────────────────────────────────
 app.use(helmet({ contentSecurityPolicy: false }));
