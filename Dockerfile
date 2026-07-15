@@ -7,8 +7,9 @@ WORKDIR /app
 COPY backend/package*.json ./
 RUN npm ci --only=production
 
-# Copy backend files
+# Copy backend and frontend files
 COPY backend/ ./
+COPY frontend/ ../frontend/
 
 # Create uploads directory
 RUN mkdir -p uploads/screenshots

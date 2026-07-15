@@ -314,6 +314,9 @@ def search_naukri_jobs(query: str, location: str, limit: int = 15,
     """
     Search public Naukri job listings using Playwright.
     """
+    import traceback
+    print("Entering search_naukri_jobs()")
+    
     exclude_urls = exclude_urls or set()
     results = []
     seen_this_run = set()
@@ -334,22 +337,22 @@ def search_naukri_jobs(query: str, location: str, limit: int = 15,
     domain = "https://www.naukri.com"
     
     with sync_playwright() as p:
-        browser = p.chromium.launch(
-            headless=False,
-            args=[
-                '--disable-blink-features=AutomationControlled',
-                '--window-position=-3000,-3000'
-            ]
-        )
-        ctx = browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                       "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            locale="en-US",
-            viewport={"width": 1280, "height": 900},
-        )
-        page = ctx.new_page()
-
         try:
+            browser = p.chromium.launch(
+                headless=False,
+                args=[
+                    '--disable-blink-features=AutomationControlled',
+                    '--window-position=-3000,-3000'
+                ]
+            )
+            ctx = browser.new_context(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                           "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                locale="en-US",
+                viewport={"width": 1280, "height": 900},
+            )
+            page = ctx.new_page()
+
             for page_num in range(1, max_pages + 1):
                 if len(results) >= limit:
                     break
@@ -371,19 +374,50 @@ def search_naukri_jobs(query: str, location: str, limit: int = 15,
                 if query_params:
                     search_url += "?" + "&".join(query_params)
                 
+                print(f"Generated search URL: {search_url}")
+                
                 page.goto(search_url, timeout=35000, wait_until="domcontentloaded")
                 page.wait_for_timeout(3500)
 
-                title_lower = (page.title() or "").lower()
+                current_url = page.url
+                print(f"Final page URL: {current_url}")
+                
+                title = page.title() or ""
+                title_lower = title.lower()
+                print(f"Page title: {title}")
+                
+                content = page.content() or ""
+                content_lower = content.lower()
+
+                # Checks for Captcha, login, block
                 if "access denied" in title_lower or any(hint in title_lower for hint in _BLOCK_TITLE_HINTS):
-                    print(f"Blocked by Naukri anti-bot at page {page_num}.")
-                    break
+                    print("Detected page type: Access Denied")
+                    raise Exception("Access denied")
+                
+                if "captcha" in title_lower or "verify you are human" in title_lower or "robot" in title_lower or "captcha" in content_lower[:2000]:
+                    print("Detected page type: CAPTCHA")
+                    raise Exception("CAPTCHA detected")
+                    
+                if "login" in title_lower or "sign in" in title_lower:
+                    print("Detected page type: Login Page")
+                    raise Exception("Login required")
+                    
+                clean_search_url = search_url.split('?')[0].rstrip('/')
+                clean_current_url = current_url.split('?')[0].rstrip('/')
+                
+                if clean_search_url != clean_current_url:
+                    print(f"Detected page type: Redirected (Search page changed)")
+                    print(f"Redirected from {clean_search_url} to {clean_current_url}")
+                    # Could raise Exception("Search page changed") here, but let's see if cards exist first.
 
                 card_selectors = [
                     'article.jobTuple',
                     '.srp-jobtuple-wrapper',
                     'div.jobTuple',
-                    'div[data-job-id]'
+                    'div[data-job-id]',
+                    '.cust-job-tuple',
+                    'div.list > article',
+                    'div.job-tuple'
                 ]
                 
                 cards = []
@@ -392,18 +426,44 @@ def search_naukri_jobs(query: str, location: str, limit: int = 15,
                     if cards:
                         break
 
+                # Automatic DOM inspection fallback for selectors
                 if not cards:
-                    break
+                    job_links = page.query_selector_all('a[href*="/job-listings-"]')
+                    if job_links:
+                        print("CSS selectors didn't match directly. Automatically inspected DOM and found job links.")
+                        unique_parents = []
+                        for link in job_links:
+                            parent = link.evaluate_handle('el => el.closest("article") || el.closest("div[class*=\'tuple\']") || el.closest("div[class*=\'wrapper\']") || el.parentElement')
+                            if parent:
+                                unique_parents.append(parent.as_element())
+                        
+                        # filter out None and duplicates (requires some custom logic, Playwright elements don't hash well)
+                        cards = []
+                        seen_handles = set()
+                        for p in unique_parents:
+                            if p:
+                                html = p.evaluate('el => el.outerHTML')
+                                if html not in seen_handles:
+                                    seen_handles.add(html)
+                                    cards.append(p)
+                                    
+                print(f"Number of job cards found: {len(cards)}")
+
+                if not cards:
+                    print(f"First 3000 characters of HTML:\n{content[:3000]}")
+                    if clean_search_url != clean_current_url:
+                        raise Exception("Search page changed")
+                    raise Exception("Selector outdated")
 
                 for card in cards:
                     if len(results) >= limit:
                         break
                     try:
-                        title_el = (card.query_selector('a.title') or card.query_selector('.title'))
-                        company_el = (card.query_selector('a.comp-name') or card.query_selector('.subTitle') or card.query_selector('.company'))
-                        location_el = (card.query_selector('.locWdth') or card.query_selector('.location'))
-                        snippet_el = (card.query_selector('.job-description') or card.query_selector('.ellipsis.job-description'))
-                        exp_el = card.query_selector('.expwdth') or card.query_selector('.exp-wrap')
+                        title_el = (card.query_selector('a.title') or card.query_selector('.title') or card.query_selector('a[class*="title"]'))
+                        company_el = (card.query_selector('a.comp-name') or card.query_selector('.subTitle') or card.query_selector('.company') or card.query_selector('[class*="comp-name"]'))
+                        location_el = (card.query_selector('.locWdth') or card.query_selector('.location') or card.query_selector('[class*="locWdth"]'))
+                        snippet_el = (card.query_selector('.job-description') or card.query_selector('.ellipsis.job-description') or card.query_selector('[class*="job-desc"]'))
+                        exp_el = card.query_selector('.expwdth') or card.query_selector('.exp-wrap') or card.query_selector('[class*="expwdth"]')
                         
                         title = title_el.inner_text().strip() if title_el else "Unknown Title"
                         company = company_el.inner_text().strip() if company_el else "Unknown Company"
@@ -456,8 +516,11 @@ def search_naukri_jobs(query: str, location: str, limit: int = 15,
                     
         except Exception as e:
             print(f"Error during Naukri search: {e}")
+            traceback.print_exc()
+            raise e
         finally:
-            browser.close()
+            if 'browser' in locals():
+                browser.close()
 
     return results, excluded_count
 

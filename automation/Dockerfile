@@ -13,8 +13,7 @@ RUN apt-get update && apt-get install -y \
 COPY automation/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Playwright browsers
-RUN playwright install chromium
+# Install Playwright OS dependencies
 RUN playwright install-deps chromium
 
 # Copy automation files
